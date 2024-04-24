@@ -42,6 +42,7 @@ class Order(Base):
     point_end: Mapped[str] = mapped_column(String(200))
 
 
+
 async def async_main():
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)

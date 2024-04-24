@@ -4,16 +4,22 @@ from aiogram.types import Message, CallbackQuery, ReplyKeyboardRemove
 from aiogram.filters import CommandStart
 from aiogram.fsm.context import FSMContext
 from aiogram.filters.state import State, StatesGroup, StateFilter
+from haversine import haversine, Unit
 
 import app.keyboards as kb
 from app.geolocation import coords_to_address, addess_to_coords
 from app.database.requests import set_user, set_order
+from filters.chat_type import ChatTypeFilter
+
 
 router = Router()
+router.message.filter(ChatTypeFilter(['private']))
 class AddOrder(StatesGroup):
+    tg_id = State()
     point_start = State()
     point_end = State()
     phone = State()
+
 
 
 @router.message(CommandStart())
@@ -37,16 +43,17 @@ async def point_starter(message: Message, state: FSMContext):
     address_go = message.text
     print(address_go)
     try:
-        longitude_end, latitude_end = [float(x) for x in addess_to_coords(address_go).split(' ')]
+        longitude_end, latitude_end, trimmed_string = await addess_to_coords(address_go)
+        print(trimmed_string)
+        print(longitude_end, latitude_end)
     except IndexError:
         await message.answer('Улица и дом не корретно')
         await state.clear()
         full_name = message.from_user.full_name
         await message.answer(f'<b>Добро пожаловать {full_name} </b>😊', reply_markup=kb.main)
         return
-    print(longitude_end, latitude_end)
 
-    await state.update_data(point_start=message.text)
+    await state.update_data(point_start=trimmed_string)
     data = await state.get_data()
     point = data.get('point_start')
     await message.answer(f'<b>🅰️: {point} \n📍----\n\n🅱️: Куда едем?\n️Напишите улицу и № дома</b>')
@@ -54,13 +61,24 @@ async def point_starter(message: Message, state: FSMContext):
 
 
 @router.message(AddOrder.point_start)
-async def point_starter(message: Message, state: FSMContext):
+async def point_start(message: Message, state: FSMContext):
     await message.answer(f'Введите корреткно от куда едите')
 
 
 @router.message(AddOrder.point_end, F.text)
 async def phone(message: Message, state: FSMContext):
-    await state.update_data(point_end=message.text)
+    address_go = message.text
+    try:
+        longitude_end, latitude_end, trimmed_string = await addess_to_coords(address_go)
+        print(trimmed_string)
+        print(longitude_end, latitude_end)
+    except IndexError:
+        await message.answer('Улица и дом не корретно')
+        await state.clear()
+        full_name = message.from_user.full_name
+        await message.answer(f'<b>Добро пожаловать {full_name} </b>😊', reply_markup=kb.main)
+        return
+    await state.update_data(point_end=trimmed_string)
     await state.set_state(AddOrder.phone)
     await message.answer('Отправь телефон', reply_markup=await kb.phone())
 
@@ -72,12 +90,20 @@ async def phone(message: Message, state: FSMContext):
 
 @router.message(AddOrder.phone, F.contact)
 async def phone(message: Message, state: FSMContext):
-    await state.update_data(phone=message.contact.phone_number)
+    await state.update_data(phone=message.contact.phone_number, tg_id=message.from_user.id)
     data = await state.get_data()
     await set_order(data)
     await message.answer(str(data))
-    await message.answer('Товар успешно добавлен', reply_markup=ReplyKeyboardRemove())
+    await message.answer(f"<i><b>Ваш заказ.</b></i>\n\n"
+                         f"<i><b>Начальная точка:</b></i> {data['point_start']}\n\n"
+                         f"<i><b>Конечная точка:</b></i> {data['point_end']}\n\n"
+                         f"<i><b>Расстояние:</b></i> 2км\n\n"
+                         f"<i><b>Время пути:</b></i> 1000 мин\n\n"
+                         f"<b>Цена:</b> 2000₽",
+                         reply_markup=ReplyKeyboardRemove())
     await state.clear()
+
+
 
 
 @router.message(AddOrder.phone)

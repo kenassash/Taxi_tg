@@ -1,58 +1,51 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# In[ ]:
-
-
-import requests
+import aiohttp
+import asyncio
 from dotenv import load_dotenv
 import os
 
-
 load_dotenv()
-def coords_to_address(x, y):
+
+
+async def coords_to_address(x, y):
     geocoder_request = f"https://geocode-maps.yandex.ru/1.x/?apikey={os.getenv('YANDEX')}={x},{y}&format=json"
 
-    # Выполняем запрос.
-    response = requests.get(geocoder_request)
-    if response:
-        # Преобразуем ответ в json-объект
-        json_response = response.json()
+    async with aiohttp.ClientSession() as session:
+        async with session.get(geocoder_request) as response:
+            if response.status == 200:
+                json_response = await response.json()
 
-        # Получаем первый топоним из ответа геокодера.
-        # Согласно описанию ответа, он находится по следующему пути:
-        toponym = json_response["response"]["GeoObjectCollection"]["featureMember"][0]["GeoObject"]
-        # Полный адрес топонима:
-        toponym_address = toponym["metaDataProperty"]["GeocoderMetaData"]["text"]
-        # Координаты центра топонима:
-        toponym_coodrinates = toponym["Point"]["pos"]
-        # Печатаем извлечённые из ответа поля:
-        return toponym_address
-    else:
-        print("Ошибка выполнения запроса:")
-        print(geocoder_request)
-        print("Http статус:", response.status_code, "(", response.reason, ")")
+                toponym = json_response["response"]["GeoObjectCollection"]["featureMember"][0]["GeoObject"]
+                toponym_address = toponym["metaDataProperty"]["GeocoderMetaData"]["text"]
+
+                return toponym_address
+            else:
+                print("Ошибка выполнения запроса:")
+                print(geocoder_request)
+                print("Http статус:", response.status, "(", response.reason, ")")
 
 
-def addess_to_coords(address):
+async def addess_to_coords(address):
     geocoder_request = f"https://geocode-maps.yandex.ru/1.x/?apikey={os.getenv('YANDEX')}&geocode={os.getenv('LOCATION')}+{address}&format=json"
 
-    # Выполняем запрос.
-    response = requests.get(geocoder_request)
-    if response:
-        # Преобразуем ответ в json-объект
-        json_response = response.json()
+    async with aiohttp.ClientSession() as session:
+        async with session.get(geocoder_request) as response:
+            if response.status == 200:
+                json_response = await response.json()
 
-        # Получаем первый топоним из ответа геокодера.
-        # Согласно описанию ответа, он находится по следующему пути:
-        toponym = json_response["response"]["GeoObjectCollection"]["featureMember"][0]["GeoObject"]
-        # Полный адрес топонима:
-        toponym_address = toponym["metaDataProperty"]["GeocoderMetaData"]["text"]
-        # Координаты центра топонима:
-        toponym_coodrinates = toponym["Point"]["pos"]
-        # Печатаем извлечённые из ответа поля:
-        return toponym_coodrinates
-    else:
-        print("Ошибка выполнения запроса:")
-        print(geocoder_request)
-        print("Http статус:", response.status_code, "(", response.reason, ")")
+                toponym = json_response["response"]["GeoObjectCollection"]["featureMember"][0]["GeoObject"]
+                toponym_address = toponym["metaDataProperty"]["GeocoderMetaData"]["text"]
+                toponym_coodrinates = toponym["Point"]["pos"]
+
+                longitude_end, latitude_end = [float(x) for x in toponym_coodrinates.split()] # убирает запятую между координатами
+                trimmed_string = ", ".join(toponym_address.split(", ")[2:])  # Убирает Россиия и Амурская область
+
+                return longitude_end, latitude_end, trimmed_string
+            else:
+                print("Ошибка выполнения запроса:")
+                print(geocoder_request)
+                print("Http статус:", response.status, "(", response.reason, ")")
+
+

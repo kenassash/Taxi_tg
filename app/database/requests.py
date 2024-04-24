@@ -16,3 +16,9 @@ async def set_order(data):
     async with async_session() as session:
         session.add(Order(**data))
         await session.commit()
+
+
+async def get_all_orders(id):
+     async with async_session() as session:
+         result = await session.scalars(select(Order).where(Order.id == id))
+         return result

@@ -10,6 +10,8 @@ from app.database.models import async_main
 from app.handlers import router
 from app.common import menu
 
+from handlers.user_group import user_group_router
+
 
 
 
@@ -20,6 +22,7 @@ async def main():
     dp = Dispatcher()
     await bot.set_my_commands(commands=menu)
     dp.include_routers(router)
+    dp.include_router(user_group_router)
     await dp.start_polling(bot)
 
 
