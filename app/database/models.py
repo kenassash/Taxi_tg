@@ -37,9 +37,29 @@ class Order(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     tg_id = mapped_column(BigInteger)
     phone: Mapped[int] = mapped_column()
-    price: Mapped[int] = mapped_column(nullable=True)
+
     point_start: Mapped[str] = mapped_column(String(200))
     point_end: Mapped[str] = mapped_column(String(200))
+
+    distance: Mapped[int] = mapped_column(nullable=True)
+    time_way: Mapped[int] = mapped_column(nullable=True)
+    price: Mapped[int] = mapped_column(nullable=True)
+
+    coordinat_start_x: Mapped[float] = mapped_column(nullable=True)
+    coordinat_start_y: Mapped[float] = mapped_column(nullable=True)
+    coordinat_end_x: Mapped[float] = mapped_column(nullable=True)
+    coordinat_end_y: Mapped[float] = mapped_column(nullable=True)
+
+
+class Driver(Base):
+    __tablename__ = 'drivers'
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    tg_id = mapped_column(BigInteger)
+    phone: Mapped[int] = mapped_column(nullable=True)
+    car_name: Mapped[str] = mapped_column(String(100))
+    number_car: Mapped[int] = mapped_column(nullable=True)
+    photo_car: Mapped[str] = mapped_column(String(150), nullable=True)
 
 
 

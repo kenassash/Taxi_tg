@@ -11,6 +11,7 @@ from app.handlers import router
 from app.common import menu
 
 from handlers.user_group import user_group_router
+from app.admin import admin
 
 
 
@@ -21,8 +22,7 @@ async def main():
     bot = Bot(token=os.getenv('TOKEN'), default=DefaultBotProperties(parse_mode=ParseMode.HTML))
     dp = Dispatcher()
     await bot.set_my_commands(commands=menu)
-    dp.include_routers(router)
-    dp.include_router(user_group_router)
+    dp.include_routers(admin, user_group_router, router)
     await dp.start_polling(bot)
 
 

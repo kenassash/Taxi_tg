@@ -19,3 +19,14 @@ async def phone():
     )
     return keyboard
 
+async def accept(order_id):
+    keyboard = InlineKeyboardBuilder()
+    keyboard.add(InlineKeyboardButton(text='Принять заказ', callback_data=f'accept_{order_id}'))
+    return keyboard.adjust().as_markup()
+
+async def close():
+    keyboard = InlineKeyboardBuilder()
+    keyboard.add(InlineKeyboardButton(text='Отказаться', callback_data=f'close_'))
+    return keyboard.adjust().as_markup()
+
+
