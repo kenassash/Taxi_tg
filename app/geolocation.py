@@ -10,7 +10,7 @@ load_dotenv()
 
 
 async def coords_to_address(x, y):
-    geocoder_request = f"https://geocode-maps.yandex.ru/1.x/?apikey={os.getenv('YANDEX')}={x},{y}&format=json"
+    geocoder_request = f"https://geocode-maps.yandex.ru/1.x/?apikey={os.getenv('YANDEX')}&geocode={x},{y}&format=json"
 
     async with aiohttp.ClientSession() as session:
         async with session.get(geocoder_request) as response:
@@ -19,8 +19,10 @@ async def coords_to_address(x, y):
 
                 toponym = json_response["response"]["GeoObjectCollection"]["featureMember"][0]["GeoObject"]
                 toponym_address = toponym["metaDataProperty"]["GeocoderMetaData"]["text"]
+                trimmed_string = ", ".join(toponym_address.split(", ")[2:])
 
-                return toponym_address
+
+                return trimmed_string
             else:
                 print("Ошибка выполнения запроса:")
                 print(geocoder_request)

@@ -12,6 +12,7 @@ async def set_user(tg_id):
             session.add(User(tg_id=tg_id))
             await session.commit()
 
+
 async def set_order(data):
     async with async_session() as session:
         order = Order(**data)
@@ -22,11 +23,18 @@ async def set_order(data):
 
 
 async def get_all_orders(id):
-     async with async_session() as session:
-         result = await session.scalar(select(Order).where(Order.id == id))
-         return result
+    async with async_session() as session:
+        result = await session.scalar(select(Order).where(Order.id == id))
+        return result
+
 
 async def add_car(data):
     async with async_session() as session:
         session.add(Driver(**data))
         await session.commit()
+
+
+async def get_driver(tg_id):
+    async with async_session() as session:
+        driver = await session.scalar(select(Driver).where(Driver.tg_id == tg_id))
+        return driver

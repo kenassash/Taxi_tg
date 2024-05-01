@@ -1,7 +1,7 @@
 import os
 import asyncio
 import logging
-from aiogram import Bot, Dispatcher
+from aiogram import Bot, Dispatcher, types
 from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
 from dotenv import load_dotenv
@@ -21,7 +21,7 @@ async def main():
     load_dotenv()
     bot = Bot(token=os.getenv('TOKEN'), default=DefaultBotProperties(parse_mode=ParseMode.HTML))
     dp = Dispatcher()
-    await bot.set_my_commands(commands=menu)
+    await bot.set_my_commands(commands=menu, scope=types.BotCommandScopeAllPrivateChats())
     dp.include_routers(admin, user_group_router, router)
     await dp.start_polling(bot)
 
