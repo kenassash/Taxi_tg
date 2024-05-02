@@ -1,6 +1,6 @@
 import os
 
-from sqlalchemy import BigInteger, ForeignKey, String, DateTime, func
+from sqlalchemy import BigInteger, ForeignKey, String, DateTime, func, Boolean
 from sqlalchemy.orm import Mapped, mapped_column, relationship, DeclarativeBase
 from sqlalchemy.ext.asyncio import AsyncAttrs, async_sessionmaker, create_async_engine
 
@@ -60,6 +60,8 @@ class Driver(Base):
     car_name: Mapped[str] = mapped_column(String(100))
     number_car: Mapped[int] = mapped_column(nullable=True)
     photo_car: Mapped[str] = mapped_column(String(150), nullable=True)
+
+    active: Mapped[bool] = mapped_column(Boolean, default=False)
 
 
 

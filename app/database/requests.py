@@ -38,3 +38,18 @@ async def get_driver(tg_id):
     async with async_session() as session:
         driver = await session.scalar(select(Driver).where(Driver.tg_id == tg_id))
         return driver
+
+async def active_driver(tg_id, is_start=True):
+    async with async_session() as session:
+        driver = await session.scalar(select(Driver).where(Driver.tg_id == tg_id))
+        driver.active = is_start
+        await session.commit()
+
+async def get_all_car():
+    async with async_session() as session:
+        driver = await session.scalars(select(Driver))
+        return driver
+async def remove_car(id):
+    async with async_session() as session:
+        await session.execute(delete(Driver).where(Driver.id == id))
+        await session.commit()

@@ -12,7 +12,7 @@ from dotenv import load_dotenv
 
 import app.keyboards as kb
 from app.geolocation import coords_to_address, addess_to_coords
-from app.database.requests import set_user, set_order, get_all_orders
+from app.database.requests import set_user, set_order, get_all_orders, get_driver, active_driver
 from filters.chat_type import ChatTypeFilter
 from app.calculate import length_way
 
@@ -37,6 +37,12 @@ class AddOrder(StatesGroup):
 async def cmd_start(message: Message, state: FSMContext):
     if state.set_state():
         await state.clear()
+
+    drivers = await get_driver(message.from_user.id)
+    if drivers.tg_id == message.from_user.id:
+        await message.answer(f'<b>Добро пожаловать Таксист {message.from_user.full_name}</b>😊',
+                             reply_markup=await kb.driver_start_or_finish())
+        return
 
     await set_user(message.from_user.id)
     full_name = message.from_user.full_name
@@ -171,3 +177,19 @@ async def cancelorder(callback: CallbackQuery, state: FSMContext):
 async def cancelorder(message: Message, state: FSMContext):
     await state.clear()
     await message.answer(f'Вы отменили заказ. Нажмитке /start чтоб начать поездку')
+
+
+# ----------------Команды для Таксистов---------------
+# ----------------Выйти на линию ---------------------
+@router.callback_query(F.data.startswith('driverstart_'))
+async def driver_start(callback: CallbackQuery):
+    await callback.answer('')
+    await active_driver(callback.message.chat.id, is_start=True)
+    await callback.message.edit_text('Хорошо')
+
+# ----------------Уйти с линии на линию ---------------------
+@router.callback_query(F.data.startswith('driverfinish_'))
+async def driver_finish(callback: CallbackQuery):
+    await callback.answer('')
+    await active_driver(callback.message.chat.id, is_start=False)
+    await callback.message.edit_text('Плохо')

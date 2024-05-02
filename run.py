@@ -16,12 +16,15 @@ from app.admin import admin
 
 
 
+
 async def main():
     await async_main()
     load_dotenv()
     bot = Bot(token=os.getenv('TOKEN'), default=DefaultBotProperties(parse_mode=ParseMode.HTML))
+    bot.my_admins_list = [216159472]
     dp = Dispatcher()
     await bot.set_my_commands(commands=menu, scope=types.BotCommandScopeAllPrivateChats())
+    # await bot.set_my_commands(commands=driver_menu, scope=types.BotCommandScopeAllGroupChats())
     dp.include_routers(admin, user_group_router, router)
     await dp.start_polling(bot)
 
