@@ -2,12 +2,14 @@ from aiogram.types import (ReplyKeyboardMarkup, KeyboardButton,
                            InlineKeyboardMarkup, InlineKeyboardButton)
 from aiogram.utils.keyboard import InlineKeyboardBuilder, ReplyKeyboardBuilder
 
-main = InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text='Создать заказ', callback_data='neworder')]])
+main = InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text='Создать заказ 🏎️', callback_data='neworder')]])
 
 async def admin_keyboard():
     keyboard = InlineKeyboardBuilder()
     keyboard.add(InlineKeyboardButton(text='Добавить автомобиль', callback_data='add_car'))
     keyboard.add(InlineKeyboardButton(text='Удалить автомобиль', callback_data='delete_car'))
+    keyboard.add(InlineKeyboardButton(text='Посмотреть онлайн табло', callback_data='online'))
+    keyboard.add(InlineKeyboardButton(text='Отправить сообщение пользователям', callback_data='newletter'))
     return keyboard.adjust(2).as_markup()
 
 async def geolocate_point_start():
@@ -49,6 +51,7 @@ async def driver_start_or_finish():
     keyboard = InlineKeyboardBuilder()
     keyboard.add(InlineKeyboardButton(text='Выйти на линию', callback_data=f'driverstart_'))
     keyboard.add(InlineKeyboardButton(text='Уйти с линии', callback_data=f'driverfinish_'))
+    keyboard.add(InlineKeyboardButton(text='Создать заказ', callback_data='neworder'))
     return keyboard.adjust(2).as_markup()
 
 async def delete_car(id):

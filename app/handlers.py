@@ -39,8 +39,8 @@ async def cmd_start(message: Message, state: FSMContext):
         await state.clear()
 
     drivers = await get_driver(message.from_user.id)
-    if drivers.tg_id == message.from_user.id:
-        await message.answer(f'<b>Добро пожаловать Таксист {message.from_user.full_name}</b>😊',
+    if drivers and drivers.tg_id == message.from_user.id:
+        await message.answer(f'<b>Добро пожаловать Таксист {message.from_user.full_name}</b>😊\n\n',
                              reply_markup=await kb.driver_start_or_finish())
         return
 
@@ -53,7 +53,8 @@ async def cmd_start(message: Message, state: FSMContext):
 async def neworder(callback: CallbackQuery, state: FSMContext):
     await callback.answer('')
     await callback.message.answer(
-        f'<b>🅰️: Откуда поедите ❓\n🖋️Напишите улицу и № дома\n\nили\n\nотправьте геолокацию</b>',
+        f'<b>🅰️: Отправьте вашу геолокацию с помощью кнопки или 📎\nИли напишите текстом Улицу и № дома\n'
+        f'Например: Ленина 90;</b>',
         reply_markup=await kb.geolocate_point_start())
     await state.set_state(AddOrder.point_start)
 
@@ -85,7 +86,8 @@ async def point_starter(message: Message, state: FSMContext):
                             coordinat_start_y=float(latitude_end))
     data = await state.get_data()
     point = data.get('point_start')
-    await message.answer(f'<b>🅰️: {point} \n📍----\n\n🅱️: Куда едем?\n️Напишите улицу и № дома</b>',
+    await message.answer(f'<b>🅰️: {point}\n\n🅱️: Теперь так же отправьте геолокацию с помощью  кнопки или 📎\n'
+                         f'Или напишите текстом Улицу и № дома\nНапример: Ленина 60;</b>',
                          reply_markup=await kb.cancel_order())
     await state.set_state(AddOrder.point_end)
 

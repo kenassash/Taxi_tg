@@ -14,9 +14,6 @@ from handlers.user_group import user_group_router
 from app.admin import admin
 
 
-
-
-
 async def main():
     await async_main()
     load_dotenv()

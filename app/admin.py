@@ -1,4 +1,5 @@
 import os
+from datetime import timedelta
 
 from aiogram import Router, F, Bot
 from aiogram.types import Message, CallbackQuery, ReplyKeyboardRemove
@@ -6,14 +7,14 @@ from aiogram.filters import CommandStart, Command, Filter
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 
-from app.database.requests import add_car, get_all_car, remove_car
+from app.database.requests import add_car, get_all_car, remove_car, print_all_online_executions, \
+    get_all_drivers_with_update_date, get_users
 
 import app.keyboards as kb
 from filters.chat_type import ChatTypeFilter, IsAdmin
 
 admin = Router()
 admin.message.filter(ChatTypeFilter(["private"]), IsAdmin())
-
 
 
 class AddDriver(StatesGroup):
@@ -23,15 +24,19 @@ class AddDriver(StatesGroup):
     photo_car = State()
     tg_id = State()
 
+
 # class AdminProtect(Filter):
 #     async def __call__(self, message: Message):
 #         return message.from_user.id in [216159472]
 
 
-
-@admin.message(IsAdmin(),Command("admin"))
+@admin.message(IsAdmin(), Command("admin"))
 async def admin_features(message: Message):
+    # test = await get_info_online_tablo()
+    # for i in test:
+    #     await message.answer(i)
     await message.answer("Что хотите сделать?", reply_markup=await kb.admin_keyboard())
+
 
 # ------------------Добавить машину /add_car-----------------------
 
@@ -113,9 +118,10 @@ async def delete_car_message(callback: CallbackQuery):
     for driver in drivers:
         await callback.message.answer_photo(photo=driver.photo_car)
         await callback.message.answer(f"{driver.phone}\n{driver.car_name}\n{driver.number_car}\n",
-                             reply_markup=await kb.delete_car(driver.id))
+                                      reply_markup=await kb.delete_car(driver.id))
 
 
+# ------------------Удалить машину /delete_car-----------------------
 @admin.callback_query(IsAdmin(), F.data.startswith('deletecar_'))
 async def delete_car_callback(callback: CallbackQuery):
     await callback.answer('')
@@ -124,4 +130,52 @@ async def delete_car_callback(callback: CallbackQuery):
     await callback.message.edit_text('Машина успешно удалена')
 
 
-# ------------------Удалить машину /delete_car-----------------------
+# ------------------вывод таблицы онлайн-----------------------
+@admin.callback_query(IsAdmin(), F.data == 'online')
+async def admin_features(callback: CallbackQuery):
+    await callback.answer('')
+    all_drivers = await get_all_drivers_with_update_date()
+
+    active_drivers = [driver for driver in all_drivers if driver.active]
+    inactive_drivers = [driver for driver in all_drivers if not driver.active]
+
+    for driver in active_drivers:
+        await callback.message.answer(f'Активные водители:\n'
+                                      f'{driver.car_name}{driver.number_car} Дата обновления {driver.updated + timedelta(hours=9)}')
+
+    for driver in inactive_drivers:
+        await callback.message.answer(f'Неактивные водители:\n'
+                                      f'{driver.car_name}{driver.number_car} Дата обновления {driver.updated + timedelta(hours=9)}')
+
+    online_executions = await print_all_online_executions()
+    for online_execution in online_executions:
+        order = online_execution
+        for driver in order.drivers_reply:
+            # Выводим информацию о каждом водителе, связанном с этим заказом
+            await callback.message.answer(f'Водитель машины -{driver.car_name} {driver.number_car}\n'
+                                          f'Выполняет заказ №{order.id}\n'
+                                          f"Начальная точка:{order.point_start}\n"
+                                          f"Конечная точка: {order.point_end}\n"
+                                          f"Расстояние:{order.distance}км\n"
+                                          f"Время пути:{order.time_way}мин\n"
+                                          f"Цена: {order.price}")
+
+#--------------рассылка сообщений всем пользователям-------------
+class Newsletter(StatesGroup):
+    message = State()
+@admin.callback_query(IsAdmin(), F.data == 'newletter')
+async def newsletter(callback: CallbackQuery, state: FSMContext):
+    await callback.answer('')
+    await state.set_state(Newsletter.message)
+    await callback.message.answer('Отправьте сообщение, которовые вы хотите разослать всем пользователям')
+
+@admin.message(IsAdmin(), Newsletter.message)
+async def newsletter_message(message: Message, state: FSMContext):
+    await message.answer('Подождите .. идет рассылка')
+    for user in await get_users():
+        try:
+            await message.send_copy(chat_id=user.tg_id)
+        except:
+            pass
+    await message.answer('Рассылка успешно завершена')
+    await state.clear()

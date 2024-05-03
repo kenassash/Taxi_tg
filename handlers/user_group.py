@@ -8,7 +8,7 @@ from filters.chat_type import ChatTypeFilter
 from aiogram.filters import CommandStart, Command, Filter
 from aiogram import Bot
 import app.keyboards as kb
-from app.database.requests import get_all_orders, get_driver
+from app.database.requests import get_all_orders, get_driver, start_order_execution, delete_order_execution
 
 user_group_router = Router()
 user_group_router.message.filter(ChatTypeFilter(['group', 'supergroup']))
@@ -35,6 +35,10 @@ async def accept(callback: CallbackQuery, bot: Bot):
     await callback.answer('')
     order_id = await get_all_orders(callback.data.split('_')[1])
     driver = await get_driver(callback.from_user.id)
+
+    # Создаем запись о начале выполнения заказа
+    await start_order_execution(order_id.id, driver.id)
+
     await callback.message.edit_text(f'<i><b>Заказ № {order_id.id}</b></i>\n'
                                      f'Принял -  {callback.from_user.first_name} \n'
                                      f'Номер телефона  +{order_id.phone}')
@@ -48,6 +52,10 @@ async def accept(callback: CallbackQuery, bot: Bot):
 async def accept(callback: CallbackQuery, bot: Bot):
     await callback.answer('')
     order_id = await get_all_orders(callback.data.split('_')[1])
+    driver_id = await get_driver(callback.from_user.id)
+    # Удаляем запись запись о начале выполнения заказа
+    await delete_order_execution(order_id.id, driver_id.id)
+
     await callback.message.edit_text(f'Ты отказался от заказа №{order_id.id}')
     await bot.send_message(chat_id=os.getenv('CHAT_GROUP_ID'),
                            text=f'Водитель {callback.from_user.first_name} отменил выпонление заказа\n'
@@ -63,6 +71,10 @@ async def accept(callback: CallbackQuery, bot: Bot):
 async def accept(callback: CallbackQuery, bot: Bot):
     await callback.answer('')
     order_id = await get_all_orders(callback.data.split('_')[1])
+    driver_id = await get_driver(callback.from_user.id)
+    # Удаляем запись запись о начале выполнения заказа
+    await delete_order_execution(order_id.id, driver_id.id)
+
     await callback.message.edit_text(f'Заказ выполнен {order_id.id}')
     await bot.send_message(chat_id=os.getenv('CHAT_GROUP_ID'),
                            text=f"Заказ № {order_id.id} выполнен ✅\n\n"

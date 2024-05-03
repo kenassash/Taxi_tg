@@ -1,4 +1,5 @@
 import os
+from typing import List
 
 from sqlalchemy import BigInteger, ForeignKey, String, DateTime, func, Boolean
 from sqlalchemy.orm import Mapped, mapped_column, relationship, DeclarativeBase
@@ -23,12 +24,12 @@ class Base(AsyncAttrs, DeclarativeBase):
 Заказ(ид, телефон, начальная точка, конечная точка, цена, тег_ид
 """
 
+
 class User(Base):
     __tablename__ = 'users'
 
     id: Mapped[int] = mapped_column(primary_key=True)
     tg_id = mapped_column(BigInteger)
-
 
 
 class Order(Base):
@@ -50,6 +51,9 @@ class Order(Base):
     coordinat_end_x: Mapped[float] = mapped_column(nullable=True)
     coordinat_end_y: Mapped[float] = mapped_column(nullable=True)
 
+    drivers_reply: Mapped[List['Driver']] = relationship(back_populates='orders_reply',
+                                                         secondary='order_executions')
+
 
 class Driver(Base):
     __tablename__ = 'drivers'
@@ -63,8 +67,18 @@ class Driver(Base):
 
     active: Mapped[bool] = mapped_column(Boolean, default=False)
 
+    orders_reply: Mapped[List['Order']] = relationship(back_populates='drivers_reply',
+                                                       secondary='order_executions')
+
+
+class OnlineExecution(Base):
+    __tablename__ = 'order_executions'
+
+    driver_id: Mapped[int] = mapped_column(ForeignKey('drivers.id', ondelete='CASCADE'), primary_key=True)
+    order_id: Mapped[int] = mapped_column(ForeignKey('orders.id', ondelete='CASCADE'), primary_key=True)
 
 
 async def async_main():
     async with engine.begin() as conn:
+        # await conn.run_sync(Base.metadata.drop_all)
         await conn.run_sync(Base.metadata.create_all)
