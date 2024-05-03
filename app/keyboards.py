@@ -8,10 +8,16 @@ async def admin_keyboard():
     keyboard = InlineKeyboardBuilder()
     keyboard.add(InlineKeyboardButton(text='Добавить автомобиль', callback_data='add_car'))
     keyboard.add(InlineKeyboardButton(text='Удалить автомобиль', callback_data='delete_car'))
-    keyboard.add(InlineKeyboardButton(text='Посмотреть онлайн табло', callback_data='online'))
-    keyboard.add(InlineKeyboardButton(text='Отправить сообщение пользователям', callback_data='newletter'))
+    keyboard.add(InlineKeyboardButton(text='Онлайн табло', callback_data='online'))
+    keyboard.add(InlineKeyboardButton(text='Рассылка пользователям', callback_data='newletter'))
+    keyboard.add(InlineKeyboardButton(text='Поменять тариф', callback_data='change_settings'))
     return keyboard.adjust(2).as_markup()
 
+async def admin_change_price():
+    keyboard = InlineKeyboardBuilder()
+    keyboard.add(InlineKeyboardButton(text='Цена за километр', callback_data='distance_rate'))
+    keyboard.add(InlineKeyboardButton(text='Цена за минуту', callback_data='time_rate'))
+    return keyboard.adjust(2).as_markup()
 async def geolocate_point_start():
     keyboard = ReplyKeyboardMarkup(
         keyboard=[

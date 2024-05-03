@@ -7,6 +7,7 @@ from aiogram.filters import CommandStart, Command, Filter
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 
+from app.change_price import Settings
 from app.database.requests import add_car, get_all_car, remove_car, print_all_online_executions, \
     get_all_drivers_with_update_date, get_users
 
@@ -178,4 +179,49 @@ async def newsletter_message(message: Message, state: FSMContext):
         except:
             pass
     await message.answer('Рассылка успешно завершена')
+    await state.clear()
+
+
+#----------Изменить цену поездки----------
+@admin.callback_query(IsAdmin(), F.data == 'change_settings')
+async def change_settings_callback(callback: CallbackQuery, state: FSMContext):
+    await callback.answer('')
+    await state.set_state(ChangeSettings.setting)
+    await callback.message.answer('Выберите настройку, которую вы хотите изменить:',
+                                  reply_markup=await kb.admin_change_price())
+
+
+class ChangeSettings(StatesGroup):
+    setting = State()
+    change_price = State()
+
+
+@admin.callback_query(IsAdmin(), F.data == 'distance_rate')
+async def set_distance_rate(callback: CallbackQuery, state: FSMContext):
+    await callback.answer('')
+    await state.update_data(change_price='distance_rate')
+    await state.set_state(ChangeSettings.setting)
+    await callback.message.answer('Введите новую цену за километр:')
+
+
+@admin.callback_query(IsAdmin(), F.data == 'time_rate')
+async def set_time_rate(callback: CallbackQuery, state: FSMContext):
+    await callback.answer('')
+    await state.update_data(change_price='time_rate')
+    await state.set_state(ChangeSettings.setting)
+    await callback.message.answer('Введите новую цену за минуту:')
+
+
+@admin.message(IsAdmin(), ChangeSettings.setting, F.text)
+async def change_settings_value(message: Message, state: FSMContext):
+    await state.update_data(setting=message.text)
+    data = await state.get_data()
+    print(str(data))
+    change_price = data.get('change_price')
+    if change_price == 'distance_rate':
+        Settings.set_distance_rate(int(message.text))
+        await message.answer(f'Цена за километр успешно изменена{Settings.distance_rate}')
+    elif change_price == 'time_rate':
+        Settings.set_time_rate(int(message.text))
+        await message.answer(f'Цена за минуту успешно изменена {Settings.time_rate}')
     await state.clear()

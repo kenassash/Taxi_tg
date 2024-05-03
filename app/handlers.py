@@ -6,7 +6,6 @@ from aiogram.types import Message, CallbackQuery, ReplyKeyboardRemove
 from aiogram.filters import CommandStart
 from aiogram.fsm.context import FSMContext
 from aiogram.filters.state import State, StatesGroup, StateFilter
-from haversine import haversine, Unit
 from aiogram import Bot
 from dotenv import load_dotenv
 
