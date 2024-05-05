@@ -1,7 +1,6 @@
 import os
 
 from aiogram import Router, F
-from aiogram.handlers import CallbackQueryHandler
 from aiogram.types import Message, CallbackQuery, ReplyKeyboardRemove
 from aiogram.filters import CommandStart
 from aiogram.fsm.context import FSMContext
@@ -37,6 +36,7 @@ async def cmd_start(message: Message, state: FSMContext):
     if state.set_state():
         await state.clear()
 
+# проверка если таксист
     drivers = await get_driver(message.from_user.id)
     if drivers and drivers.tg_id == message.from_user.id:
         await message.answer(f'<b>Добро пожаловать Таксист {message.from_user.full_name}</b>😊\n\n',
@@ -74,7 +74,7 @@ async def point_starter(message: Message, state: FSMContext):
             print(trimmed_string)
 
     except IndexError:
-        await message.answer('Улица и дом не корретно')
+        await message.answer('Улица и дом не корретно введены')
         await state.clear()
         full_name = message.from_user.full_name
         await message.answer(f'<b>Добро пожаловать {full_name} </b>😊', reply_markup=kb.main)
@@ -174,11 +174,6 @@ async def cancelorder(callback: CallbackQuery, state: FSMContext):
     await callback.message.answer(f'Вы отменили заказ. Нажмитке /start чтоб начать поездку')
 
 
-@router.message(F.text.lower() == 'Отменить заказ')
-async def cancelorder(message: Message, state: FSMContext):
-    await state.clear()
-    await message.answer(f'Вы отменили заказ. Нажмитке /start чтоб начать поездку')
-
 
 # ----------------Команды для Таксистов---------------
 # ----------------Выйти на линию ---------------------
@@ -186,11 +181,11 @@ async def cancelorder(message: Message, state: FSMContext):
 async def driver_start(callback: CallbackQuery):
     await callback.answer('')
     await active_driver(callback.message.chat.id, is_start=True)
-    await callback.message.edit_text('Хорошо')
+    await callback.message.edit_text('Вы вышли на линию')
 
 # ----------------Уйти с линии на линию ---------------------
 @router.callback_query(F.data.startswith('driverfinish_'))
 async def driver_finish(callback: CallbackQuery):
     await callback.answer('')
     await active_driver(callback.message.chat.id, is_start=False)
-    await callback.message.edit_text('Плохо')
+    await callback.message.edit_text('Вы ушли с линии')

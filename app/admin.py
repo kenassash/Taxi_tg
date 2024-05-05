@@ -201,7 +201,8 @@ async def set_distance_rate(callback: CallbackQuery, state: FSMContext):
     await callback.answer('')
     await state.update_data(change_price='distance_rate')
     await state.set_state(ChangeSettings.setting)
-    await callback.message.answer('Введите новую цену за километр:')
+    await callback.message.answer('Введите новую цену за километр:\n'
+                                  'По умолчанию цена 40 за километр')
 
 
 @admin.callback_query(IsAdmin(), F.data == 'time_rate')
@@ -209,7 +210,8 @@ async def set_time_rate(callback: CallbackQuery, state: FSMContext):
     await callback.answer('')
     await state.update_data(change_price='time_rate')
     await state.set_state(ChangeSettings.setting)
-    await callback.message.answer('Введите новую цену за минуту:')
+    await callback.message.answer(f'Введите новую цену за минуту:\n'
+                                  f'По умолчанию цена 10 за минуту')
 
 
 @admin.message(IsAdmin(), ChangeSettings.setting, F.text)

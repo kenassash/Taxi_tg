@@ -1,11 +1,9 @@
 import os
-from string import punctuation
 from aiogram import Router, F
 from aiogram.types import Message, CallbackQuery
 from dotenv import load_dotenv
 
 from filters.chat_type import ChatTypeFilter
-from aiogram.filters import CommandStart, Command, Filter
 from aiogram import Bot
 import app.keyboards as kb
 from app.database.requests import get_all_orders, get_driver, start_order_execution, delete_order_execution
@@ -14,7 +12,7 @@ user_group_router = Router()
 user_group_router.message.filter(ChatTypeFilter(['group', 'supergroup']))
 load_dotenv()
 
-restricted_words = {'кабан', 'хомяк', 'выпухоль'}
+# restricted_words = {'кабан', 'хомяк', 'выпухоль'}
 
 
 # def clean_text(text: str):
@@ -42,7 +40,7 @@ async def accept(callback: CallbackQuery, bot: Bot):
     await callback.message.edit_text(f'<i><b>Заказ № {order_id.id}</b></i>\n'
                                      f'Принял -  {callback.from_user.first_name} \n'
                                      f'Номер телефона  +{order_id.phone}')
-    await bot.send_photo(chat_id=order_id.tg_id, photo=driver.photo_car, caption=f'За вами приедет {driver.car_name}')
+    await bot.send_photo(chat_id=order_id.tg_id, photo=driver.photo_car, caption=f'За вами приедет такси <i><b>{driver.car_name} {driver.number_car}</b></i>\n')
     await bot.send_message(chat_id=callback.from_user.id,
                            text=callback.message.text,
                            reply_markup=await kb.close_and_finish(order_id.id))
@@ -56,7 +54,7 @@ async def accept(callback: CallbackQuery, bot: Bot):
     # Удаляем запись запись о начале выполнения заказа
     await delete_order_execution(order_id.id, driver_id.id)
 
-    await callback.message.edit_text(f'Ты отказался от заказа №{order_id.id}')
+    await callback.message.edit_text(f'Вы отказались от заказа №<i><b>{order_id.id}</b></i>')
     await bot.send_message(chat_id=os.getenv('CHAT_GROUP_ID'),
                            text=f'Водитель {callback.from_user.first_name} отменил выпонление заказа\n'
                                 f'{callback.message.text}\n',
@@ -64,7 +62,7 @@ async def accept(callback: CallbackQuery, bot: Bot):
 
     await bot.send_message(chat_id=order_id.tg_id,
                            text=f'Ожидайте ⌛\n'
-                                f'Будет назначен новый водитель>\n')
+                                f'Будет назначен новый водитель в ближайшее время\n')
 
 
 @user_group_router.callback_query(F.data.startswith('finish_'))
