@@ -25,7 +25,8 @@ async def admin_change_price():
 async def geolocate_point_start():
     keyboard = ReplyKeyboardMarkup(
         keyboard=[
-            [KeyboardButton(text='Определить место положение 🌐', request_location=True), ]
+            [KeyboardButton(text='Определить место положение 🌐', request_location=True), ],
+            [KeyboardButton(text='Отменить'), ]
         ],
         resize_keyboard=True,
         one_time_keyboard=True
@@ -35,7 +36,10 @@ async def geolocate_point_start():
 
 async def phone():
     keyboard = ReplyKeyboardMarkup(
-        keyboard=[[KeyboardButton(text='Отправь номер телефона ☎️', request_contact=True), ]],
+        keyboard=[
+            [KeyboardButton(text='Отправь номер телефона ☎️', request_contact=True), ],
+            [KeyboardButton(text='Отменить'), ]
+        ],
         resize_keyboard=True,
         one_time_keyboard=True
     )
