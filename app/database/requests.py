@@ -87,8 +87,8 @@ async def print_all_online_executions():
     async with async_session() as session:
 #------ Выполняем запрос для получения всех онлайн-исполнений-----------------
         query = (
-            select(Order)
-            .options(joinedload(Order.drivers_reply))
+            select(Driver)
+            .options(selectinload(Driver.orders_reply))
         )
         res = await session.execute(query)
         result = res.unique().scalars().all()

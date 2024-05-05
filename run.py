@@ -8,20 +8,20 @@ from dotenv import load_dotenv
 
 from app.database.models import async_main
 from app.handlers import router
-from app.common import menu
+from app.common import menu, admin_menu
 
 from handlers.user_group import user_group_router
 from app.admin import admin
 
-
+my_admin_list = [216159472]
 async def main():
     await async_main()
     load_dotenv()
     bot = Bot(token=os.getenv('TOKEN'), default=DefaultBotProperties(parse_mode=ParseMode.HTML))
-    bot.my_admins_list = [216159472]
+    bot.my_admins_list = my_admin_list
     dp = Dispatcher()
     await bot.set_my_commands(commands=menu, scope=types.BotCommandScopeAllPrivateChats())
-    # await bot.set_my_commands(commands=driver_menu, scope=types.BotCommandScopeAllGroupChats())
+    await bot.set_my_commands(commands=admin_menu, scope=types.BotCommandScopeChat(chat_id=216159472))
     dp.include_routers(admin, user_group_router, router)
     await dp.start_polling(bot)
 

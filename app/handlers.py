@@ -18,6 +18,10 @@ router = Router()
 router.message.filter(ChatTypeFilter(['private']))
 load_dotenv()
 
+@router.message(F.text == 'Отменить')
+async def cancel_order_reply(message: Message, state: FSMContext):
+    await state.clear()
+    await message.answer(f'Вы отменили заказ. Нажмитке /start чтоб начать поездку', reply_markup=ReplyKeyboardRemove())
 
 class AddOrder(StatesGroup):
     tg_id = State()
@@ -87,7 +91,7 @@ async def point_starter(message: Message, state: FSMContext):
     point = data.get('point_start')
     await message.answer(f'<b>🅰️: {point}\n\n🅱️: Теперь так же отправьте геолокацию с помощью  кнопки или 📎\n'
                          f'Или напишите текстом Улицу и № дома\nНапример: Ленина 60;</b>',
-                         reply_markup=await kb.cancel_order())
+                         reply_markup=await kb.geolocate_point_start())
     await state.set_state(AddOrder.point_end)
 
 
@@ -171,7 +175,7 @@ async def cancelorder(callback: CallbackQuery, state: FSMContext):
     await callback.answer('')
     await state.clear()
     await callback.message.delete()
-    await callback.message.answer(f'Вы отменили заказ. Нажмитке /start чтоб начать поездку')
+    await callback.message.answer(f'Вы отменили')
 
 
 

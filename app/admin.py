@@ -150,8 +150,8 @@ async def admin_features(callback: CallbackQuery):
 
     online_executions = await print_all_online_executions()
     for online_execution in online_executions:
-        order = online_execution
-        for driver in order.drivers_reply:
+        driver = online_execution
+        for order in driver.orders_reply:
             # Выводим информацию о каждом водителе, связанном с этим заказом
             await callback.message.answer(f'Водитель машины -{driver.car_name} {driver.number_car}\n'
                                           f'Выполняет заказ №{order.id}\n'
