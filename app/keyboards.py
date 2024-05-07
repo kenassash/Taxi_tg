@@ -19,6 +19,7 @@ async def admin_change_price():
     keyboard = InlineKeyboardBuilder()
     keyboard.add(InlineKeyboardButton(text='Цена за километр', callback_data='distance_rate'))
     keyboard.add(InlineKeyboardButton(text='Цена за минуту', callback_data='time_rate'))
+    keyboard.add(InlineKeyboardButton(text='Изменить ценну', callback_data='fix_price'))
     return keyboard.adjust(2).as_markup()
 
 
@@ -65,16 +66,28 @@ async def cancel_order():
     keyboard.add(InlineKeyboardButton(text='Отменить заказ', callback_data=f'cancelorder_'))
     return keyboard.adjust().as_markup()
 
+async def back_button():
+    keyboard = InlineKeyboardBuilder()
+    keyboard.add(InlineKeyboardButton(text='Назад', callback_data=f'backbutton_'))
+    keyboard.add(InlineKeyboardButton(text='Отменить заказ', callback_data=f'cancelorder_'))
+    return keyboard.adjust().as_markup()
 
 async def driver_start_or_finish():
     keyboard = InlineKeyboardBuilder()
     keyboard.add(InlineKeyboardButton(text='Выйти на линию', callback_data=f'driverstart_'))
     keyboard.add(InlineKeyboardButton(text='Уйти с линии', callback_data=f'driverfinish_'))
-    keyboard.add(InlineKeyboardButton(text='Создать заказ', callback_data='neworder'))
+    keyboard.add(InlineKeyboardButton(text='Создать заказ 🏎️', callback_data='neworder'))
+
     return keyboard.adjust(2).as_markup()
 
 
 async def delete_car(id):
     keyboard = InlineKeyboardBuilder()
     keyboard.add(InlineKeyboardButton(text='Удалить машину', callback_data=f'deletecar_{id}'))
+    return keyboard.adjust().as_markup()
+
+async def go_to_order():
+    keyboard = InlineKeyboardBuilder()
+    url_group = 'https://t.me/Taxigreencar_bot'
+    keyboard.add(InlineKeyboardButton(text='Перейти к заказу', url=url_group))
     return keyboard.adjust().as_markup()

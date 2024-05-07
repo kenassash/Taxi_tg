@@ -37,13 +37,11 @@ async def accept(callback: CallbackQuery, bot: Bot):
     # Создаем запись о начале выполнения заказа
     await start_order_execution(order_id.id, driver.id)
 
-    await callback.message.edit_text(f'<i><b>Заказ № {order_id.id}</b></i>\n'
-                                     f'Принял -  {callback.from_user.first_name} \n'
-                                     f'Номер телефона  +{order_id.phone}')
     await bot.send_photo(chat_id=order_id.tg_id, photo=driver.photo_car, caption=f'За вами приедет такси <i><b>{driver.car_name} {driver.number_car}</b></i>\n')
     await bot.send_message(chat_id=callback.from_user.id,
                            text=callback.message.text,
                            reply_markup=await kb.close_and_finish(order_id.id))
+    await callback.message.edit_text(text=f'Такси бот', reply_markup=await kb.go_to_order())
 
 
 @user_group_router.callback_query(F.data.startswith('close_'))
@@ -73,10 +71,12 @@ async def accept(callback: CallbackQuery, bot: Bot):
     # Удаляем запись запись о начале выполнения заказа
     await delete_order_execution(order_id.id, driver_id.id)
 
-    await callback.message.edit_text(f'Заказ выполнен {order_id.id}')
-    await bot.send_message(chat_id=os.getenv('CHAT_GROUP_ID'),
-                           text=f"Заказ № {order_id.id} выполнен ✅\n\n"
-                                f"Водителем {callback.from_user.first_name}")
+    await callback.message.delete()
+
+    # await callback.message.edit_text(f'Заказ выполнен {order_id.id}')
+    # await bot.send_message(chat_id=os.getenv('CHAT_GROUP_ID'),
+    #                        text=f"Заказ № {order_id.id} выполнен ✅\n\n"
+    #                             f"Водителем {callback.from_user.first_name}")
     await bot.send_message(chat_id=order_id.tg_id,
                            text=f'Заказ выполнен✅.\n '
                                 f'Спасибо что пользуетесь нашими услугами 🙏\n ')

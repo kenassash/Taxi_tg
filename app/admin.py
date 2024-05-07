@@ -168,7 +168,7 @@ class Newsletter(StatesGroup):
 async def newsletter(callback: CallbackQuery, state: FSMContext):
     await callback.answer('')
     await state.set_state(Newsletter.message)
-    await callback.message.answer('Отправьте сообщение, которовые вы хотите разослать всем пользователям')
+    await callback.message.answer('Отправьте сообщение, которовые вы хотите разослать всем пользователям', await kb.cancel_order())
 
 @admin.message(IsAdmin(), Newsletter.message)
 async def newsletter_message(message: Message, state: FSMContext):
@@ -187,8 +187,9 @@ async def newsletter_message(message: Message, state: FSMContext):
 async def change_settings_callback(callback: CallbackQuery, state: FSMContext):
     await callback.answer('')
     await state.set_state(ChangeSettings.setting)
-    await callback.message.answer('Выберите настройку, которую вы хотите изменить:',
-                                  reply_markup=await kb.admin_change_price())
+    await callback.message.answer(f'Введите сумму на которую хотите увеличить:\n'
+                                  f'По умолчанию стоит 0',
+                                  reply_markup=await kb.cancel_order())
 
 
 class ChangeSettings(StatesGroup):
@@ -196,34 +197,35 @@ class ChangeSettings(StatesGroup):
     change_price = State()
 
 
-@admin.callback_query(IsAdmin(), F.data == 'distance_rate')
-async def set_distance_rate(callback: CallbackQuery, state: FSMContext):
-    await callback.answer('')
-    await state.update_data(change_price='distance_rate')
-    await state.set_state(ChangeSettings.setting)
-    await callback.message.answer('Введите новую цену за километр:\n'
-                                  'По умолчанию цена 40 за километр')
-
-
-@admin.callback_query(IsAdmin(), F.data == 'time_rate')
-async def set_time_rate(callback: CallbackQuery, state: FSMContext):
-    await callback.answer('')
-    await state.update_data(change_price='time_rate')
-    await state.set_state(ChangeSettings.setting)
-    await callback.message.answer(f'Введите новую цену за минуту:\n'
-                                  f'По умолчанию цена 10 за минуту')
-
-
+# @admin.callback_query(IsAdmin(), F.data == 'distance_rate')
+# async def set_distance_rate(callback: CallbackQuery, state: FSMContext):
+#     await callback.answer('')
+#     await state.update_data(change_price='distance_rate')
+#     await state.set_state(ChangeSettings.setting)
+#     await callback.message.answer('Введите новую цену за километр:\n'
+#                                   'По умолчанию цена 40 за километр', await kb.cancel_order())
+#
+#
+# @admin.callback_query(IsAdmin(), F.data == 'time_rate')
+# async def set_time_rate(callback: CallbackQuery, state: FSMContext):
+#     await callback.answer('')
+#     await state.update_data(change_price='time_rate')
+#     await state.set_state(ChangeSettings.setting)
+#     await callback.message.answer(f'Введите новую цену за минуту:\n'
+#                                   f'По умолчанию цена 10 за минуту', await kb.cancel_order())
+#
+#
 @admin.message(IsAdmin(), ChangeSettings.setting, F.text)
 async def change_settings_value(message: Message, state: FSMContext):
     await state.update_data(setting=message.text)
-    data = await state.get_data()
-    print(str(data))
-    change_price = data.get('change_price')
-    if change_price == 'distance_rate':
-        Settings.set_distance_rate(int(message.text))
-        await message.answer(f'Цена за километр успешно изменена{Settings.distance_rate}')
-    elif change_price == 'time_rate':
-        Settings.set_time_rate(int(message.text))
-        await message.answer(f'Цена за минуту успешно изменена {Settings.time_rate}')
+    Settings.set_fix_price(int(message.text))
+    await message.answer(f'Цена успешна добавлена {Settings.fix_price}')
+
+    # change_price = data.get('change_price')
+    # if change_price == 'distance_rate':
+    #     Settings.set_distance_rate(int(message.text))
+    #     await message.answer(f'Цена за километр успешно изменена {Settings.distance_rate}')
+    # elif change_price == 'time_rate':
+    #     Settings.set_time_rate(int(message.text))
+    #     await message.answer(f'Цена за минуту успешно изменена {Settings.time_rate}')
     await state.clear()

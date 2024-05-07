@@ -15,5 +15,6 @@ async def length_way(longitude_start, latitude_start, longitude_end, latitude_en
     time_way = round(length_way / (20 * 1000) * 60)  # Время в мин
     distance = length_way / 1000  # Расстояние в км
 
-    price = round(distance * Settings.distance_rate + Settings.time_rate * time_way)  # Цена
+    # price = round(distance * Settings.distance_rate + Settings.time_rate * time_way)  # Цена
+    price = round(100 + Settings.fix_price)
     return distance, time_way, price
