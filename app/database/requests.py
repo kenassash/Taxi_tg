@@ -6,12 +6,12 @@ from app.database.models import async_session
 from sqlalchemy import select, update, delete, desc
 
 
-async def set_user(tg_id):
+async def set_user(tg_id, phone):
     async with async_session() as session:
         user = await session.scalar(select(User).where(User.tg_id == tg_id))
 
         if not user:
-            session.add(User(tg_id=tg_id))
+            session.add(User(tg_id=tg_id, phone=phone))
             await session.commit()
 
 async def get_users():
@@ -20,9 +20,10 @@ async def get_users():
         return users
 
 
-async def set_order(data):
+async def set_order(user_id, data):
     async with async_session() as session:
         order = Order(**data)
+        order.user = user_id
         session.add(order)
         await session.commit()  # Сохраняем изменения в базу данных
         await session.refresh(order)  # Обновляем объект, чтобы получить актуальный id
@@ -31,21 +32,30 @@ async def set_order(data):
 
 async def get_all_orders(id):
     async with async_session() as session:
-        result = await session.scalar(select(Order).where(Order.id == id))
+        # result = await session.scalar(select(Order).where(Order.id == id))
+        result = await session.scalar(select(Order)
+                                      .where(Order.id == id)
+                                      .options(joinedload(Order.user_rel)))
         return result
 
 
 async def add_car(data):
     async with async_session() as session:
-        session.add(Driver(**data))
+        driver = Driver(**data)
+        session.add(driver)
         await session.commit()
+        await session.refresh(driver)  # Обновляем объект, чтобы получить актуальный id
+        return driver.id
 
 
 async def get_driver(tg_id):
     async with async_session() as session:
         driver = await session.scalar(select(Driver).where(Driver.tg_id == tg_id))
         return driver
-
+async def get_user(tg_id):
+    async with async_session() as session:
+        user = await session.scalar(select(User).where(User.tg_id == tg_id))
+        return user
 async def active_driver(tg_id, is_start=True):
     async with async_session() as session:
         driver = await session.scalar(select(Driver).where(Driver.tg_id == tg_id))
@@ -56,6 +66,12 @@ async def get_all_car():
     async with async_session() as session:
         driver = await session.scalars(select(Driver))
         return driver
+
+async def get_one_car(id):
+    async with async_session() as session:
+        driver = await session.scalar(select(Driver).where(Driver.id == id))
+        return driver
+
 async def remove_car(id):
     async with async_session() as session:
         await session.execute(delete(Driver).where(Driver.id == id))
@@ -103,3 +119,35 @@ async def get_all_drivers_with_update_date():
         result = await session.execute(drivers_query)
         drivers = result.scalars().all()
         return drivers
+
+
+async def get_driver_info(driver_id: int) -> dict:
+    async with async_session() as session:
+        # Получаем информацию о водителе
+        query_driver = (
+            select(Driver)
+            .options(
+                selectinload(Driver.orders_reply)
+            )
+            .where(Driver.id == driver_id)
+        )
+        result_driver = await session.execute(query_driver)
+        driver = result_driver.unique().scalars().first()
+        return driver
+
+
+        # if driver:
+        # #     # Вычисляем общее количество заказов и заработок водителя
+        # #     total_orders = len(driver.orders_reply)
+        # #     total_earnings = sum(order.price for order in driver.orders_reply)
+        # #
+        # #     # Формируем результат в виде словаря
+        # #     driver_info = {
+        # #         "id": driver.id,
+        # #         "car_name": driver.car_name,
+        # #         "total_orders": total_orders,
+        # #         "total_earnings": total_earnings
+        # #     }
+        #     return driver
+        # else:
+        #     return None

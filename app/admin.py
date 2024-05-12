@@ -1,3 +1,4 @@
+import json
 import os
 from datetime import timedelta
 
@@ -9,7 +10,7 @@ from aiogram.fsm.state import State, StatesGroup
 
 from app.change_price import Settings
 from app.database.requests import add_car, get_all_car, remove_car, print_all_online_executions, \
-    get_all_drivers_with_update_date, get_users
+    get_all_drivers_with_update_date, get_users, get_one_car, get_driver_info
 
 import app.keyboards as kb
 from filters.chat_type import ChatTypeFilter, IsAdmin
@@ -128,38 +129,38 @@ async def delete_car_callback(callback: CallbackQuery):
     await callback.answer('')
     await remove_car(callback.data.split('_')[1])
     print(callback.data.split('_')[1])
-    await callback.message.edit_text('Машина успешно удалена')
+    await callback.message.edit_text('Машина удалена')
 
 
 # ------------------вывод таблицы онлайн-----------------------
-@admin.callback_query(IsAdmin(), F.data == 'online')
-async def admin_features(callback: CallbackQuery):
-    await callback.answer('')
-    all_drivers = await get_all_drivers_with_update_date()
-
-    active_drivers = [driver for driver in all_drivers if driver.active]
-    inactive_drivers = [driver for driver in all_drivers if not driver.active]
-
-    for driver in active_drivers:
-        await callback.message.answer(f'Активные водители:\n'
-                                      f'{driver.car_name}{driver.number_car} Дата обновления {driver.updated + timedelta(hours=9)}')
-
-    for driver in inactive_drivers:
-        await callback.message.answer(f'Неактивные водители:\n'
-                                      f'{driver.car_name}{driver.number_car} Дата обновления {driver.updated + timedelta(hours=9)}')
-
-    online_executions = await print_all_online_executions()
-    for online_execution in online_executions:
-        driver = online_execution
-        for order in driver.orders_reply:
-            # Выводим информацию о каждом водителе, связанном с этим заказом
-            await callback.message.answer(f'Водитель машины -{driver.car_name} {driver.number_car}\n'
-                                          f'Выполняет заказ №{order.id}\n'
-                                          f"Начальная точка:{order.point_start}\n"
-                                          f"Конечная точка: {order.point_end}\n"
-                                          f"Расстояние:{order.distance}км\n"
-                                          f"Время пути:{order.time_way}мин\n"
-                                          f"Цена: {order.price}")
+# @admin.callback_query(IsAdmin(), F.data == 'online')
+# async def admin_features(callback: CallbackQuery):
+#     await callback.answer('')
+#     all_drivers = await get_all_drivers_with_update_date()
+#
+#     active_drivers = [driver for driver in all_drivers if driver.active]
+#     inactive_drivers = [driver for driver in all_drivers if not driver.active]
+#
+#     for driver in active_drivers:
+#         await callback.message.answer(f'Активные водители:\n'
+#                                       f'{driver.car_name}{driver.number_car} Дата обновления {driver.updated + timedelta(hours=9)}')
+#
+#     for driver in inactive_drivers:
+#         await callback.message.answer(f'Неактивные водители:\n'
+#                                       f'{driver.car_name}{driver.number_car} Дата обновления {driver.updated + timedelta(hours=9)}')
+#
+#     online_executions = await print_all_online_executions()
+#     for online_execution in online_executions:
+#         driver = online_execution
+#         for order in driver.orders_reply:
+#             # Выводим информацию о каждом водителе, связанном с этим заказом
+#             await callback.message.answer(f'Водитель машины -{driver.car_name} {driver.number_car}\n'
+#                                           f'Выполняет заказ №{order.id}\n'
+#                                           f"Начальная точка:{order.point_start}\n"
+#                                           f"Конечная точка: {order.point_end}\n"
+#                                           f"Расстояние:{order.distance}км\n"
+#                                           f"Время пути:{order.time_way}мин\n"
+#                                           f"Цена: {order.price}")
 
 #--------------рассылка сообщений всем пользователям-------------
 class Newsletter(StatesGroup):
@@ -168,7 +169,8 @@ class Newsletter(StatesGroup):
 async def newsletter(callback: CallbackQuery, state: FSMContext):
     await callback.answer('')
     await state.set_state(Newsletter.message)
-    await callback.message.answer('Отправьте сообщение, которовые вы хотите разослать всем пользователям', await kb.cancel_order())
+    await callback.message.answer('Отправьте сообщение, которовые вы хотите разослать всем пользователям',
+                                  reply_markup=await kb.cancel_order())
 
 @admin.message(IsAdmin(), Newsletter.message)
 async def newsletter_message(message: Message, state: FSMContext):
@@ -229,3 +231,53 @@ async def change_settings_value(message: Message, state: FSMContext):
     #     Settings.set_time_rate(int(message.text))
     #     await message.answer(f'Цена за минуту успешно изменена {Settings.time_rate}')
     await state.clear()
+
+
+
+#Добавление машины от пользователя
+@admin.callback_query(IsAdmin(), F.data.startswith('addcaradmin_'))
+async def addcaradmin(callback: CallbackQuery, bot: Bot):
+    await callback.answer('')
+    answer = callback.data.split("_")[2]
+    driver_id = callback.data.split("_")[1]
+    driver_id = await get_one_car(driver_id)
+
+    if answer == "YES":
+        await callback.message.delete()
+        await bot.send_message(chat_id=driver_id.tg_id,
+                               text='Машина успешно добавлена')
+    elif answer == "NO":
+        await callback.message.delete()
+        await bot.send_message(chat_id=driver_id.tg_id,
+                               text='Извините, машина не добавлена')
+        await remove_car(callback.data.split('_')[1])
+    await bot.answer_callback_query(callback.id)
+
+@admin.callback_query(IsAdmin(), F.data == 'info')
+async def info(callback: CallbackQuery):
+    await callback.answer('')
+    await callback.message.answer('Выберите автомобиль',
+                                  reply_markup=await kb.all_car())
+
+
+@admin.callback_query(IsAdmin(), F.data.startswith('infocardriver_'))
+async def info_car_driver(callback: CallbackQuery):
+    driver_id = int(callback.data.split('_')[1])  # Получаем идентификатор водителя из колбэка
+    driver_info = await get_driver_info(driver_id)
+
+    if driver_info is not None:
+        total_orders = len(driver_info.orders_reply)
+        total_earnings = sum(order.price for order in driver_info.orders_reply)
+
+        # Формируем текст сообщения с информацией о водителе
+        message_text = (
+            f"Информация о водителе:\n"
+            f"Имя: {driver_info.car_name} - {driver_info.number_car}\n"
+            f"Всего заказов: {total_orders}\n"
+            f"Общий заработок: {total_earnings} руб."
+        )
+        await callback.answer('')
+        await callback.message.answer(message_text)
+    else:
+        await callback.answer('Информация о водителе не найдена')
+

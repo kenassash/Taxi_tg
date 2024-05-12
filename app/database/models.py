@@ -30,14 +30,18 @@ class User(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     tg_id = mapped_column(BigInteger)
+    phone: Mapped[int] = mapped_column(nullable=True)
+
+    order_rel: Mapped[List['Order']] = relationship(back_populates='user_rel')
 
 
 class Order(Base):
     __tablename__ = 'orders'
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    tg_id = mapped_column(BigInteger)
-    phone: Mapped[int] = mapped_column()
+
+    user: Mapped[int] = mapped_column(ForeignKey('users.id'))
+
 
     point_start: Mapped[str] = mapped_column(String(200))
     point_end: Mapped[str] = mapped_column(String(200))
@@ -53,6 +57,7 @@ class Order(Base):
 
     drivers_reply: Mapped[List['Driver']] = relationship(back_populates='orders_reply',
                                                          secondary='order_executions')
+    user_rel: Mapped['User'] = relationship(back_populates='order_rel')
 
 
 class Driver(Base):
@@ -82,3 +87,4 @@ async def async_main():
     async with engine.begin() as conn:
         # await conn.run_sync(Base.metadata.drop_all)
         await conn.run_sync(Base.metadata.create_all)
+
