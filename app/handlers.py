@@ -13,6 +13,7 @@ from aiogram import Bot
 from dotenv import load_dotenv
 
 import app.keyboards as kb
+from app.change_price import Settings
 from app.geolocation import coords_to_address, addess_to_coords
 from app.database.requests import set_user, set_order, get_all_orders, get_driver, active_driver, get_user, add_car
 from filters.chat_type import ChatTypeFilter
@@ -59,10 +60,10 @@ class AddOrder(StatesGroup):
     point_end = State()
     finish = State()
 
-    coordinat_start_x = State()
-    coordinat_start_y = State()
-    coordinat_end_x = State()
-    coordinat_end_y = State()
+    # coordinat_start_x = State()
+    # coordinat_start_y = State()
+    # coordinat_end_x = State()
+    # coordinat_end_y = State()
 
     texts = {
         'AddOrder:point_start': 'Введите начальную точку заново',
@@ -81,7 +82,8 @@ async def cmd_start(message: Message, state: FSMContext):
     # Проверка, является ли пользователь таксистом
     drivers = await get_driver(message.from_user.id)
     if drivers and drivers.tg_id == message.from_user.id:
-        await message.answer(f'<b>Добро пожаловать, Таксист {message.from_user.full_name}</b>😊\n\n')
+        await message.answer(f'<b>Добро пожаловать, Таксист {message.from_user.full_name}</b>😊\n\n',
+                             reply_markup=await kb.driver_start_or_finish())
         # reply_markup = await kb.driver_start_or_finish()
         return
 
@@ -133,37 +135,44 @@ async def neworder(callback: CallbackQuery, state: FSMContext, bot: Bot):
     await state.set_state(AddOrder.point_start)
 
 
-@router.message(AddOrder.point_start, (F.text | F.location))
+@router.message(AddOrder.point_start, F.text)
 async def point_starter(message: Message, state: FSMContext):
-    try:
-        if message.text:
-            address_go = message.text
-            longitude_end, latitude_end, trimmed_string = await addess_to_coords(address_go)
-            print(trimmed_string)
-            print(float(longitude_end), float(latitude_end))
-        elif message.location:
-            latitude_end = message.location.latitude
-            longitude_end = message.location.longitude
-            trimmed_string = await coords_to_address(longitude_end, latitude_end)
-            print(float(longitude_end), float(latitude_end))
-            print(trimmed_string)
-
-    except IndexError:
-        await message.answer('Улица и дом не корретно введены')
-        await state.clear()
-        full_name = message.from_user.full_name
-        await message.answer(f'<b>Добро пожаловать {full_name} </b>😊', reply_markup=await kb.main())
-        return
-
-    await state.update_data(point_start=trimmed_string,
-                            coordinat_start_x=float(longitude_end),
-                            coordinat_start_y=float(latitude_end))
+    await state.update_data(point_start=message.text)
     data = await state.get_data()
-    point = data.get('point_start')
-    await message.answer(f'<b>🅰️: {point}\n\n'
+    await message.answer(f'<b>🅰️: {data["point_start"]}\n\n'
                          f'🅱️: Напишите куда поедите?\nНапример: Ленина 60;</b>',
                          reply_markup=await kb.back_button())
     await state.set_state(AddOrder.point_end)
+
+    # try:
+    #     if message.text:
+    #         address_go = message.text
+    #         longitude_end, latitude_end, trimmed_string = await addess_to_coords(address_go)
+    #         print(trimmed_string)
+    #         print(float(longitude_end), float(latitude_end))
+    #     elif message.location:
+    #         latitude_end = message.location.latitude
+    #         longitude_end = message.location.longitude
+    #         trimmed_string = await coords_to_address(longitude_end, latitude_end)
+    #         print(float(longitude_end), float(latitude_end))
+    #         print(trimmed_string)
+
+    # except IndexError:
+    #     await message.answer('Улица и дом не корретно введены')
+    #     await state.clear()
+    #     full_name = message.from_user.full_name
+    #     await message.answer(f'<b>Добро пожаловать {full_name} </b>😊', reply_markup=await kb.main())
+    #     return
+    #
+    # await state.update_data(point_start=trimmed_string,
+    #                         coordinat_start_x=float(longitude_end),
+    #                         coordinat_start_y=float(latitude_end))
+    # data = await state.get_data()
+    # point = data.get('point_start')
+    # await message.answer(f'<b>🅰️: {point}\n\n'
+    #                      f'🅱️: Напишите куда поедите?\nНапример: Ленина 60;</b>',
+    #                      reply_markup=await kb.back_button())
+    # await state.set_state(AddOrder.point_end)
 
 
 @router.message(AddOrder.point_start)
@@ -171,47 +180,54 @@ async def point_start(message: Message, state: FSMContext):
     await message.answer(f'Введите корреткно от куда едите')
 
 
-@router.message(AddOrder.point_end, (F.text | F.location))
+@router.message(AddOrder.point_end, F.text)
 async def point_end(message: Message, state: FSMContext):
-    try:
-        if message.text:
-            address_go = message.text
-            longitude_end, latitude_end, trimmed_string = await addess_to_coords(address_go)
-            print(trimmed_string)
-            print(float(longitude_end), float(latitude_end))
-        elif message.location:
-            latitude_end = message.location.latitude
-            longitude_end = message.location.longitude
-            trimmed_string = await coords_to_address(longitude_end, latitude_end)
-            print(float(longitude_end), float(latitude_end))
-            print(trimmed_string)
-    except IndexError:
-        await message.answer('Улица и дом не корретно')
-        await state.clear()
-        full_name = message.from_user.full_name
-        await message.answer(f'<b>Добро пожаловать {full_name} </b>😊', reply_markup=await kb.main())
-        return
-    await state.update_data(point_end=trimmed_string,
-                            coordinat_end_x=float(longitude_end),
-                            coordinat_end_y=float(latitude_end))
+    await state.update_data(point_end=message.text, price=(100 + Settings.fix_price))
+    data = await state.get_data()
+    await message.answer(f"<b>🅰️: Начальная точка:</b> {data['point_start']}\n\n"
+                         f"<b>🅱️: Конечная точка:</b> {data['point_end']}\n\n"
+                         f"<b>Цена:</b> {data['price']}₽",
+                         reply_markup=await kb.order_now())
+
+    # try:
+    #     if message.text:
+    #         address_go = message.text
+    #         longitude_end, latitude_end, trimmed_string = await addess_to_coords(address_go)
+    #         print(trimmed_string)
+    #         print(float(longitude_end), float(latitude_end))
+    #     elif message.location:
+    #         latitude_end = message.location.latitude
+    #         longitude_end = message.location.longitude
+    #         trimmed_string = await coords_to_address(longitude_end, latitude_end)
+    #         print(float(longitude_end), float(latitude_end))
+    #         print(trimmed_string)
+    # except IndexError:
+    #     await message.answer('Улица и дом не корретно')
+    #     await state.clear()
+    #     full_name = message.from_user.full_name
+    #     await message.answer(f'<b>Добро пожаловать {full_name} </b>😊', reply_markup=await kb.main())
+    #     return
+    # await state.update_data(point_end=trimmed_string,
+    #                         coordinat_end_x=float(longitude_end),
+    #                         coordinat_end_y=float(latitude_end))
 
     # point = data.get('point_start')
     # end = data.get('point_end')
     # await message.answer(f'<b>🅰️: {point}\n\n'
     #                      f'🅱️: {end}\n\n</b>',
     #                      reply_markup=await kb.back_button())
-    data = await state.get_data()
-    distance, time_way, price = await length_way(data['coordinat_start_x'],
-                                                 data['coordinat_start_y'],
-                                                 data['coordinat_end_x'],
-                                                 data['coordinat_end_y'])
-    await state.update_data(distance=distance, time_way=time_way, price=price)
-    await message.answer(f"<i><b>🅰️: Начальная точка:</b></i> {data['point_start']}\n\n"
-                         f"<i><b>🅱️: Конечная точка:</b></i> {data['point_end']}\n\n"
-                         f"<i><b>Расстояние:</b></i> {distance}км\n\n"
-                         f"<i><b>Время пути:</b></i> {time_way}мин\n\n"
-                         f"<b>Цена:</b> {price}₽",
-                         reply_markup=await kb.order_now())
+    # data = await state.get_data()
+    # distance, time_way, price = await length_way(data['coordinat_start_x'],
+    #                                              data['coordinat_start_y'],
+    #                                              data['coordinat_end_x'],
+    #                                              data['coordinat_end_y'])
+    # await state.update_data(distance=distance, time_way=time_way, price=price)
+    # await message.answer(f"<b>🅰️: Начальная точка:</b> {data['point_start']}\n\n"
+    #                      f"<b>🅱️: Конечная точка:</b> {data['point_end']}\n\n"
+    #                      f"<b>Расстояние:</b> {distance}км\n\n"
+    #                      f"<b>Время пути:</b> {time_way}мин\n\n"
+    #                      f"<b>Цена:</b> {price}₽",
+    #                      reply_markup=await kb.order_now())
     await state.set_state(AddOrder.finish)
 
 
@@ -228,20 +244,20 @@ async def finish_price(callback: CallbackQuery, state: FSMContext, bot: Bot):
     order_id = await set_order(user_id.id, data)
     order_data = await get_all_orders(order_id)
     await bot.send_message(chat_id=os.getenv('CHAT_GROUP_ID'),
-                           text=f"<i><b>Заказ {order_id}</b></i>\n\n"
-                                f"<i><b>Телефон {user_id.phone}</b></i>\n\n"
-                                f"<i><b>Начальная точка:</b></i> {order_data.point_start}\n\n"
-                                f"<i><b>Конечная точка:</b></i> {order_data.point_end}\n\n"
-                                f"<i><b>Расстояние:</b></i> {order_data.distance}км\n\n"
-                                f"<i><b>Время пути:</b></i> {order_data.time_way}мин\n\n"
-                                f"<b>Цена:</b> {order_data.price}Р",
+                           text=f"Заказ <b>{order_id}</b>\n\n"
+                                f"Телефон <b>+{user_id.phone}</b>\n\n"
+                                f"Начальная точка: <b>{order_data.point_start}</b>\n\n"
+                                f"Конечная точка: <b>{order_data.point_end}</b>\n\n"
+                           # f"<b>Расстояние:</b> {order_data.distance}км\n\n"
+                           # f"<b>Время пути:</b> {order_data.time_way}мин\n\n"
+                                f"Цена: <b>{order_data.price}Р</b>",
                            reply_markup=await kb.accept(order_id, callback.message.message_id))
-    await callback.message.edit_text(f"<i><b>Ожидайте водителя⌛</b></i>\n\n"
-                                     f"<i><b>Начальная точка:</b></i> {order_data.point_start}\n\n"
-                                     f"<i><b>Конечная точка:</b></i> {order_data.point_end}\n\n"
-                                     f"<i><b>Расстояние:</b></i> {order_data.distance}км\n\n"
-                                     f"<i><b>Время пути:</b></i> {order_data.time_way}мин\n\n"
-                                     f"<b>Цена:</b> {order_data.price}₽")
+    await callback.message.edit_text(f"<b>Ожидайте водителя⌛</b>\n\n"
+                                     f"Начальная точка: <b>{order_data.point_start}</b>\n\n"
+                                     f"Конечная точка: <b>{order_data.point_end}</b>\n\n"
+                                     # f"<b>Расстояние:</b> {order_data.distance}км\n\n"
+                                     # f"<b>Время пути:</b> {order_data.time_way}мин\n\n"
+                                     f"Цена: <b>{order_data.price}Р</b>")
 
     await state.clear()
 
@@ -251,52 +267,47 @@ async def point_end(message: Message, state: FSMContext):
     await message.answer('Введите корреткно куда едите')
 
 
-# @router.message(AddOrder.phone)
-# async def phone(message: Message, state: FSMContext, bot: Bot):
-#     if(re.findall('^\+?[7][-\(]?\d{3}\)?-?\d{3}-?\d{2}-?\d{2}$', message.text)):
-#         await state.update_data(phone=message.text, tg_id=message.from_user.id)
-#         data = await state.get_data()
-#         distance, time_way, price = await length_way(data['coordinat_start_x'],
-#                                                      data['coordinat_start_y'],
-#                                                      data['coordinat_end_x'],
-#                                                      data['coordinat_end_y'])
-#
-# await state.update_data(distance=distance, time_way=time_way, price=price)
-#         data = await state.get_data()
-#         order_id = await set_order(data)
-#
-#         await message.answer(f"<i><b>Ожидайте ⌛</b></i>\n\n"
-#                              f"<i><b>Начальная точка:</b></i> {data['point_start']}\n\n"
-#                              f"<i><b>Конечная точка:</b></i> {data['point_end']}\n\n"
-#                              f"<i><b>Расстояние:</b></i> {distance}км\n\n"
-#                              f"<i><b>Время пути:</b></i> {time_way}мин\n\n"
-#                              f"<b>Цена:</b> {price}₽",
-#                              reply_markup=ReplyKeyboardRemove())
-#         order_data = await get_all_orders(order_id)
-#         await bot.send_message(chat_id=os.getenv('CHAT_GROUP_ID'),
-#                                text=f"<i><b>Заказ {order_id}</b></i>\n\n"
-#                                     f"<i><b>Телефон {order_data.phone}</b></i>\n\n"
-#                                     f"<i><b>Начальная точка:</b></i> {order_data.point_start}\n\n"
-#                                     f"<i><b>Конечная точка:</b></i> {order_data.point_end}\n\n"
-#                                     f"<i><b>Расстояние:</b></i> {order_data.distance}км\n\n"
-#                                     f"<i><b>Время пути:</b></i> {order_data.time_way}мин\n\n"
-#                                     f"<b>Цена:</b> {order_data.price}Р",
-#                                reply_markup=await kb.accept(order_id))
-#         await state.clear()
-#     else:
-#         await bot.send_message(message.from_user.id, f"Номер указан не верно")
-#
-#
-# @router.message(AddOrder.phone)
-# async def phone(message: Message, state: FSMContext):
-#     await message.answer('Отправь корректно телефон')
-
-
-@router.callback_query(F.data == 'dispetcher')
-async def driver_start(callback: CallbackQuery, state: FSMContext):
+#-------------отправка сообщения администраторам\менеджерам
+class SendMessage(StatesGroup):
+    send_manager = State()
+@router.callback_query(F.data == 'manadger')
+async def send_manager_call(callback: CallbackQuery, state: FSMContext):
     await callback.answer('')
     await state.clear()
-    await callback.message.edit_text(f'Номер диспетчера: <b>+79991668736</b>', reply_markup=await kb.main())
+    await state.set_state(SendMessage.send_manager)
+    await callback.message.edit_text(f'🖊️<b>Напишите сообщение менеджеру Такси городок</b> 🚕',
+                                     reply_markup=await kb.cancel_order())
+
+@router.message(SendMessage.send_manager)
+async def get_manager(message: Message, state: FSMContext, bot: Bot):
+    user = await get_user(message.from_user.id)
+    if message.text:
+        await state.update_data(send_manager=message.text)
+        await bot.send_message(chat_id=os.getenv('CHAT_ID_ADMIN'),
+                             text=f'Пользователь ник нейм: <b>{message.from_user.username}</b>\n'
+                                  f'Имя: <b>{message.from_user.first_name}</b>\n'
+                                  f'CHAT ID: <b>{message.from_user.id}</b>\n'
+                                  f'Телефон: <b>+{user.phone}</b>\n'
+                                  f'------------------------------\n'
+                                  f'Сообщение:\n'
+                                  f'<i>{message.text}</i>\n')
+        await state.clear()
+        await message.answer('Спасибо за сообщение. В скором времени с вами свяжется менеджер',
+                             reply_markup=await kb.main())
+
+    elif message.voice:
+        await state.update_data(send_manager=message.voice)
+        await bot.send_voice(chat_id=os.getenv('CHAT_ID_ADMIN'),
+                             caption=f'Пользователь ник нейм: <b>{message.from_user.username}</b>\n'
+                                  f'Имя: <b>{message.from_user.first_name}</b>\n'
+                                  f'CHAT ID: <b>{message.from_user.id}</b>\n'
+                                  f'Телефон: <b>+{user.phone}</b>\n',
+                             voice=message.voice.file_id)
+        await state.clear()
+        await message.answer('Спасибо за голосовое сообщение. В скором времени с вами свяжется менеджер',
+                             reply_markup=await kb.main())
+    else:
+        await message.answer('Отправь текстовое или голосовое сообщение')
 
 
 # ----------------Команды для Таксистов---------------
@@ -355,18 +366,16 @@ async def add_car_name(message: Message, state: FSMContext):
     await message.answer('Введите коррекно название машины')
 
 
-
-
 @router.message(AddDrivercar.number_car, F.text)
 async def add_tg_id(message: Message, state: FSMContext):
     await state.update_data(number_car=message.text)
     await state.set_state(AddDrivercar.photo_car)
     await message.answer('Отправь фото машины', reply_markup=await kb.cancel_order())
 
+
 @router.message(AddDrivercar.number_car)
 async def add_number_car(message: Message, state: FSMContext):
     await message.answer('Отправь коррекно гос номер')
-
 
 
 @router.message(AddDrivercar.photo_car, F.photo)
@@ -382,12 +391,11 @@ async def add_item_category(message: Message, state: FSMContext, bot: Bot):
     await bot.send_photo(chat_id=chat_admin,
                          photo=data['photo_car'],
                          caption=f'Ргеистрация автомобиля\n\n'
-                                 f'Телефон:<i><b> {data["phone"]}</b></i>\n\n'
-                                 f'Название машины: <i><b>{data["car_name"]}</b></i>\n\n'
-                                 f'Номер машины: <i><b>{data["number_car"]}Р</b></i>',
+                                 f'Телефон:<b> {data["phone"]}</b>\n\n'
+                                 f'Название машины: <b>{data["car_name"]}</b>\n\n'
+                                 f'Номер машины: <b>{data["number_car"]}Р</b>',
                          reply_markup=await kb.add_car_or_no(driver_id))
     await state.clear()
-
 
 
 @router.message(AddDrivercar.photo_car)

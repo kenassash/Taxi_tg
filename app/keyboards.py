@@ -10,12 +10,14 @@ async def main():
     keyboard.add(InlineKeyboardButton(text='Создать заказ 🏎️', callback_data='neworder'))
     return keyboard.adjust().as_markup()
 
+
 async def order_now():
     keyboard = InlineKeyboardBuilder()
     keyboard.add(InlineKeyboardButton(text='Назад', callback_data=f'backbutton_'))
     keyboard.add(InlineKeyboardButton(text='Отменить заказ', callback_data=f'cancelorder_'))
+    keyboard.add(InlineKeyboardButton(text='Написать менеджеру', callback_data='manadger'))
     keyboard.add(InlineKeyboardButton(text='Заказать', callback_data='order_now'))
-    return keyboard.adjust(2).as_markup()
+    return keyboard.adjust(2, 1, 1).as_markup()
 
 
 async def admin_keyboard():
@@ -73,10 +75,13 @@ async def close_and_finish(order_id):
     # keyboard.add(InlineKeyboardButton(text='Отказаться ❌', callback_data=f'close_{order_id}'))
     return keyboard.adjust(2).as_markup()
 
+
 async def on_the_spot_kb(order_id):
     keyboard = InlineKeyboardBuilder()
     keyboard.add(InlineKeyboardButton(text='На месте 🎯', callback_data=f'onthespot_{order_id}'))
-    return keyboard.adjust().as_markup()
+    keyboard.add(InlineKeyboardButton(text='Отказаться ❌', callback_data=f'close_{order_id}'))
+    return keyboard.adjust(1, 1).as_markup()
+
 
 async def time_wait(order_id, message_id):
     keyboard = InlineKeyboardBuilder()
@@ -86,14 +91,17 @@ async def time_wait(order_id, message_id):
     keyboard.add(InlineKeyboardButton(text='10 мин.', callback_data=f'timewait_{order_id}_10_{message_id}'))
     keyboard.add(InlineKeyboardButton(text='15 мин.', callback_data=f'timewait_{order_id}_15_{message_id}'))
     keyboard.add(InlineKeyboardButton(text='30 мин.', callback_data=f'timewait_{order_id}_30_{message_id}'))
-    return keyboard.adjust(2).as_markup()
+    keyboard.add(InlineKeyboardButton(text='На месте 🎯', callback_data=f'onthespot_{order_id}'))
+    keyboard.add(InlineKeyboardButton(text='Отказаться ❌', callback_data=f'close_{order_id}'))
+
+    return keyboard.adjust(6, 1, 1).as_markup()
 
 
 async def back_button():
     keyboard = InlineKeyboardBuilder()
     keyboard.add(InlineKeyboardButton(text='Назад', callback_data=f'backbutton_'))
     keyboard.add(InlineKeyboardButton(text='Отменить заказ', callback_data=f'cancelorder_'))
-    keyboard.add(InlineKeyboardButton(text='Диспетчер', callback_data='dispetcher'))
+    keyboard.add(InlineKeyboardButton(text='Написать менеджеру', callback_data='manadger'))
     return keyboard.adjust(2).as_markup()
 
 
@@ -106,16 +114,21 @@ async def driver_start_or_finish():
     return keyboard.adjust(2).as_markup()
 
 
-
 async def go_to_order():
     keyboard = InlineKeyboardBuilder()
     url_group = 'https://t.me/Taxi_gorodok_bot'
     keyboard.add(InlineKeyboardButton(text='Перейти к заказу', url=url_group))
     return keyboard.adjust().as_markup()
 
+
 async def delete_car(id):
     keyboard = InlineKeyboardBuilder()
     keyboard.add(InlineKeyboardButton(text='Удалить машину', callback_data=f'deletecar_{id}'))
+    return keyboard.adjust().as_markup()
+
+async def reset_zero(driver_id):
+    keyboard = InlineKeyboardBuilder()
+    keyboard.add(InlineKeyboardButton(text='Обнулить', callback_data=f'resetzero_{driver_id}'))
     return keyboard.adjust().as_markup()
 
 async def cancel_order():
@@ -123,11 +136,13 @@ async def cancel_order():
     keyboard.add(InlineKeyboardButton(text='Отменить', callback_data=f'cancelorder_'))
     return keyboard.adjust().as_markup()
 
+
 async def add_car_or_no(id):
     keyboard = InlineKeyboardBuilder()
     keyboard.add(InlineKeyboardButton(text='Принять', callback_data=f'addcaradmin_{id}_YES'))
     keyboard.add(InlineKeyboardButton(text='Отказаться', callback_data=f'addcaradmin_{id}_NO'))
     return keyboard.adjust().as_markup()
+
 
 async def all_car():
     drivers = await get_all_car()
@@ -137,4 +152,3 @@ async def all_car():
                                           callback_data=f'infocardriver_{driver.id}'))
     keyboard.add(InlineKeyboardButton(text='Отменить', callback_data=f'cancelorder_'))
     return keyboard.adjust(2).as_markup()
-

@@ -98,7 +98,16 @@ async def delete_order_execution(order_id_id, driver_id_id):
             )
         )
         await session.commit()
-
+async def reset_to_zero(driver_id_id):
+    async with async_session() as session:
+# ---------- обнуляем об водителе в  OnlineExecution
+        await session.execute(
+            delete(OnlineExecution)
+            .where(
+                (OnlineExecution.driver_id == driver_id_id)
+            )
+        )
+        await session.commit()
 async def print_all_online_executions():
     async with async_session() as session:
 #------ Выполняем запрос для получения всех онлайн-исполнений-----------------
@@ -134,20 +143,3 @@ async def get_driver_info(driver_id: int) -> dict:
         result_driver = await session.execute(query_driver)
         driver = result_driver.unique().scalars().first()
         return driver
-
-
-        # if driver:
-        # #     # Вычисляем общее количество заказов и заработок водителя
-        # #     total_orders = len(driver.orders_reply)
-        # #     total_earnings = sum(order.price for order in driver.orders_reply)
-        # #
-        # #     # Формируем результат в виде словаря
-        # #     driver_info = {
-        # #         "id": driver.id,
-        # #         "car_name": driver.car_name,
-        # #         "total_orders": total_orders,
-        # #         "total_earnings": total_earnings
-        # #     }
-        #     return driver
-        # else:
-        #     return None

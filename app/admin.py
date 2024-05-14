@@ -10,7 +10,7 @@ from aiogram.fsm.state import State, StatesGroup
 
 from app.change_price import Settings
 from app.database.requests import add_car, get_all_car, remove_car, print_all_online_executions, \
-    get_all_drivers_with_update_date, get_users, get_one_car, get_driver_info
+    get_all_drivers_with_update_date, get_users, get_one_car, get_driver_info, reset_to_zero
 
 import app.keyboards as kb
 from filters.chat_type import ChatTypeFilter, IsAdmin
@@ -268,16 +268,39 @@ async def info_car_driver(callback: CallbackQuery):
     if driver_info is not None:
         total_orders = len(driver_info.orders_reply)
         total_earnings = sum(order.price for order in driver_info.orders_reply)
+        # data_created = [data.created for data in driver_info.orders_reply]
+        # print(data_created)
 
         # Формируем текст сообщения с информацией о водителе
         message_text = (
             f"Информация о водителе:\n"
-            f"Имя: {driver_info.car_name} - {driver_info.number_car}\n"
-            f"Всего заказов: {total_orders}\n"
-            f"Общий заработок: {total_earnings} руб."
+            f"Имя: <b>{driver_info.car_name} - {driver_info.number_car}</b>\n"
+            f"Всего заказов: <b>{total_orders}</b>\n"
+            f"Общий заработок: <b>{total_earnings} руб.</b>\n"
+            f"-------------------------------\n"
         )
+        # Создаем словарь для хранения количества заказов по датам
+        orders_by_date = {}
+        for order in driver_info.orders_reply:
+            date = order.created.date()
+            orders_by_date[date] = orders_by_date.get(date, 0) + 1
+
+        # Добавляем информацию о количестве заказов по датам в текст сообщения
+        for date, count in orders_by_date.items():
+            message_text += f"{date}: -  <b>{count}</b> заказов\n"
+
         await callback.answer('')
-        await callback.message.answer(message_text)
+        await callback.message.answer(message_text, reply_markup=await kb.reset_zero(driver_id))
     else:
         await callback.answer('Информация о водителе не найдена')
+
+
+@admin.callback_query(IsAdmin(), F.data.startswith('resetzero_'))
+async def reset_zero(callback: CallbackQuery):
+    await callback.answer('')
+    driver_id = callback.data.split('_')[1]
+    await reset_to_zero(driver_id)
+    await callback.message.edit_text('Информация обнулена')
+
+
 
