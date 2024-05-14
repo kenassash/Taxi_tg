@@ -270,12 +270,11 @@ async def point_end(message: Message, state: FSMContext):
 #-------------отправка сообщения администраторам\менеджерам
 class SendMessage(StatesGroup):
     send_manager = State()
-@router.callback_query(F.data == 'manadger')
-async def send_manager_call(callback: CallbackQuery, state: FSMContext):
-    await callback.answer('')
+@router.message(Command('manager'))
+async def send_manager_call(message: Message, state: FSMContext):
     await state.clear()
     await state.set_state(SendMessage.send_manager)
-    await callback.message.edit_text(f'🖊️<b>Напишите сообщение менеджеру Такси городок</b> 🚕',
+    await message.answer(f'🖊️<b>Напишите сообщение менеджеру Такси городок</b> 🚕',
                                      reply_markup=await kb.cancel_order())
 
 @router.message(SendMessage.send_manager)

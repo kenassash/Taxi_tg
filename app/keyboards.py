@@ -15,7 +15,7 @@ async def order_now():
     keyboard = InlineKeyboardBuilder()
     keyboard.add(InlineKeyboardButton(text='Назад', callback_data=f'backbutton_'))
     keyboard.add(InlineKeyboardButton(text='Отменить заказ', callback_data=f'cancelorder_'))
-    keyboard.add(InlineKeyboardButton(text='Написать менеджеру', callback_data='manadger'))
+    # keyboard.add(InlineKeyboardButton(text='Написать менеджеру', callback_data='manadger'))
     keyboard.add(InlineKeyboardButton(text='Заказать', callback_data='order_now'))
     return keyboard.adjust(2, 1, 1).as_markup()
 
@@ -101,7 +101,7 @@ async def back_button():
     keyboard = InlineKeyboardBuilder()
     keyboard.add(InlineKeyboardButton(text='Назад', callback_data=f'backbutton_'))
     keyboard.add(InlineKeyboardButton(text='Отменить заказ', callback_data=f'cancelorder_'))
-    keyboard.add(InlineKeyboardButton(text='Написать менеджеру', callback_data='manadger'))
+    # keyboard.add(InlineKeyboardButton(text='Написать менеджеру', callback_data='manadger'))
     return keyboard.adjust(2).as_markup()
 
 
