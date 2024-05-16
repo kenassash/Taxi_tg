@@ -1,5 +1,6 @@
 import os
 from aiogram import Router, F
+from aiogram.filters import CommandStart
 from aiogram.types import Message, CallbackQuery
 from dotenv import load_dotenv
 
@@ -49,6 +50,14 @@ async def accept(callback: CallbackQuery, bot: Bot):
     #                        reply_markup=await kb.close_and_finish(order_id.id))
     # await bot.send_message(chat_id=callback.from_user.id,
     #                        text=callback.message.text)
+    await bot.send_photo(chat_id=order_id.user_rel.tg_id,
+                         photo=driver.photo_car,
+                         caption=f'Водитель принял ваше предложение 🤝\n\n'
+                                 f'Номер телефона:<b> +{driver.phone}</b>\n\n'
+                                 f'Автомобиль:<b> {driver.car_name}</b>\n\n'
+                                 f'Номер: <b>{driver.number_car}</b>\n\n'
+                                 f'Цена поездки: <b>{order_id.price}Р</b>\n\n'
+                                 f'Водитель подъедет в скором времени')
     await bot.send_message(chat_id=callback.from_user.id,
                            text=f"Заказ <b>{order_id.id}</b>\n\n"
                                 f"Телефон <b>+{order_id.user_rel.phone}</b>\n\n"
@@ -98,14 +107,18 @@ async def accept(callback: CallbackQuery, bot: Bot):
 
     await bot.delete_message(chat_id=order_id.user_rel.tg_id, message_id=message_id_id)
 
-    await bot.send_photo(chat_id=order_id.user_rel.tg_id,
-                         photo=driver.photo_car,
-                         caption=f'Водитель принял ваше предложение 🤝\n\n'
-                                 f'Номер телефона:<b> +{driver.phone}</b>\n\n'
-                                 f'Автомобиль:<b> {driver.car_name}</b>\n\n'
-                                 f'Номер: <b>{driver.number_car}</b>\n\n'
-                                 f'Цена поездки: <b>{order_id.price}Р</b>\n\n'
-                                 f'Будет у вас через {time_wait} мин.')
+    await bot.send_message(chat_id=order_id.user_rel.tg_id,
+                           text=f'Водитель принял ваше предложение 🤝\n\n'
+                                f'Будет у вас через <b>{time_wait} мин.</b>')
+
+    # await bot.send_photo(chat_id=order_id.user_rel.tg_id,
+    #                      photo=driver.photo_car,
+    #                      caption=f'Водитель принял ваше предложение 🤝\n\n'
+    #                              f'Номер телефона:<b> +{driver.phone}</b>\n\n'
+    #                              f'Автомобиль:<b> {driver.car_name}</b>\n\n'
+    #                              f'Номер: <b>{driver.number_car}</b>\n\n'
+    #                              f'Цена поездки: <b>{order_id.price}Р</b>\n\n'
+    #                              f'Будет у вас через {time_wait} мин.')
     # await bot.send_message(chat_id=callback.from_user.id,
     #                        text='принять или завершить',
     #                        reply_markup=await kb.close_and_finish(order_id.id))
@@ -129,13 +142,13 @@ async def on_the_spot(callback: CallbackQuery, bot: Bot):
     # await bot.mes(chat_id=order_id.user_rel.tg_id)
     await bot.send_message(chat_id=order_id.user_rel.tg_id,
                            text=f'<b>Водитель приехал за вами ✅🚕</b>\n\n'
-                                f'Номер телефона:<b> +{driver.phone}</b>\n\n'
-                                f'Автомобиль:<b> {driver.car_name}</b>\n\n'
-                                f'Номер: <b>{driver.number_car}</b>\n\n'
-                                f'Цена поездки: <b>{order_id.price}Р</b>\n\n',
+                                # f'Номер телефона:<b> +{driver.phone}</b>\n\n'
+                                # f'Автомобиль:<b> {driver.car_name}</b>\n\n'
+                                # f'Номер: <b>{driver.number_car}</b>\n\n'
+                                # f'Цена поездки: <b>{order_id.price}Р</b>\n\n',
                            )
     await callback.message.edit_text(f"Заказ <b>{order_id.id}</b>\n\n"
-                                     f"Телефон <b>{order_id.user_rel.phone}</b>\n\n"
+                                     f"Телефон <b>+{order_id.user_rel.phone}</b>\n\n"
                                      f"Начальная точка: <b>{order_id.point_start}</b>\n\n"
                                      f"Конечная точка: <b>{order_id.point_end}</b>\n\n"
                                      # f"Расстояние: <b>{order_id.distance}км</b>\n\n"

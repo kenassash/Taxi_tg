@@ -13,6 +13,7 @@ from aiogram import Bot
 from dotenv import load_dotenv
 
 import app.keyboards as kb
+import app.keyboard_city as kb_city
 from app.change_price import Settings
 from app.geolocation import coords_to_address, addess_to_coords
 from app.database.requests import set_user, set_order, get_all_orders, get_driver, active_driver, get_user, add_car
@@ -32,19 +33,35 @@ async def cancel_order_reply(message: Message, state: FSMContext):
 
 
 # ----------------Шаг назад---------------
+# @router.callback_query(StateFilter('*'), F.data == 'backbutton_')
+# async def backbutton(callback: CallbackQuery, state: FSMContext):
+#     current_state = await state.get_state()
+#     print(current_state)
+#
+#     previous = None
+#     for step in AddOrder.__all_states__:
+#         if step.state == current_state:
+#             await state.set_state(previous)
+#             await callback.answer('')
+#             await callback.message.edit_text(f'Вы вернулись к прошлому шагу\n{AddOrder.texts[previous.state]}\n',
+#                                              reply_markup=await kb_city.keyboard_city2())
+#             return
+#         previous = step
+
 @router.callback_query(StateFilter('*'), F.data == 'backbutton_')
 async def backbutton(callback: CallbackQuery, state: FSMContext):
     current_state = await state.get_state()
 
     previous = None
     for step in AddOrder.__all_states__:
-        if step.state == current_state:
+        if step.state == 'AddOrder:address1':
             await state.set_state(previous)
             await callback.answer('')
-            await callback.message.edit_text(f'Вы вернулись к прошлому шагу\n{AddOrder.texts[previous.state]}\n')
+            await callback.message.edit_text(f'Вы вернулись к прошлому шагу\n\n{AddOrder.texts[previous.state]}\n',
+                                             reply_markup=await kb_city.keyboard_city1())
             return
-        previous = step
 
+        previous = step
 
 # ----------------Отменить заказ---------------
 @router.callback_query(F.data.startswith('cancelorder_'))
@@ -56,9 +73,14 @@ async def cancelorder(callback: CallbackQuery, state: FSMContext):
 
 
 class AddOrder(StatesGroup):
-    point_start = State()
-    point_end = State()
-    finish = State()
+    city1 = State()
+    address1 = State()
+    city2 = State()
+    address2 = State()
+
+    # point_start = State()
+    # point_end = State()
+    # finish = State()
 
     # coordinat_start_x = State()
     # coordinat_start_y = State()
@@ -66,8 +88,11 @@ class AddOrder(StatesGroup):
     # coordinat_end_y = State()
 
     texts = {
-        'AddOrder:point_start': 'Введите начальную точку заново',
-        'AddOrder:point_end': 'Введите конечную точку заново',
+        'AddOrder:city1': 'Выберите кнопку от куда поедите',
+        'AddOrder:address1': 'Напишите адрес куда поедите',
+        'AddOrder:city2': 'Выберите кнопку куда поедите',
+        'AddOrder:address2': 'Напишите адрес от куда поедите',
+
     }
 
 
@@ -129,20 +154,56 @@ async def process_invalid_phone(message: Message):
 async def neworder(callback: CallbackQuery, state: FSMContext, bot: Bot):
     await callback.answer('')
     await callback.message.edit_text(
+        f'<b>🅰️: Выберите населенный пункт от куда поедите:</b>',
+        reply_markup=await kb_city.keyboard_city1())
+    await state.set_state(AddOrder.city1)
+
+
+@router.callback_query(AddOrder.city1, F.data.startswith('cities1_'))
+async def city1(callback: CallbackQuery, state: FSMContext, bot: Bot):
+    await callback.answer('')
+    city1 = callback.data.split('_')[1]
+    price1 = callback.data.split('_')[2]
+    await state.update_data(city1=city1, price1=price1)
+    await callback.message.edit_text(
         f'<b>🅰️: Напишите  Улицу и № дома\n'
         f'Например: Южная 8</b>',
         reply_markup=await kb.cancel_order())
-    await state.set_state(AddOrder.point_start)
+    await state.set_state(AddOrder.address1)
+
+@router.message(AddOrder.city1)
+async def city2(message: Message, state: FSMContext):
+    await message.answer('Выберите кнопку населенного пункта')
 
 
-@router.message(AddOrder.point_start, F.text)
-async def point_starter(message: Message, state: FSMContext):
-    await state.update_data(point_start=message.text)
+
+@router.message(AddOrder.address1, F.text)
+async def address1(message: Message, state: FSMContext):
+    await state.update_data(address1=message.text)
     data = await state.get_data()
-    await message.answer(f'<b>🅰️: {data["point_start"]}\n\n'
-                         f'🅱️: Напишите куда поедите?\nНапример: Ленина 60;</b>',
-                         reply_markup=await kb.back_button())
-    await state.set_state(AddOrder.point_end)
+    await message.answer(f'<b>🅰️: {data["city1"]} - {data["address1"]}\n\n'
+                         f'🅱️: Выберите населенный пункт куда поедите:</b>',
+                         reply_markup=await kb_city.keyboard_city2())
+    await state.set_state(AddOrder.city2)
+@router.message(AddOrder.address1)
+async def address1(message: Message, state: FSMContext):
+    await message.answer('Напишите адрес от куда поедите')
+
+@router.callback_query(AddOrder.city2, F.data.startswith('cities2_'))
+async def city2(callback: CallbackQuery, state: FSMContext, bot: Bot):
+    await callback.answer('')
+    city2 = callback.data.split('_')[1]
+    price2 = callback.data.split('_')[2]
+    await state.update_data(city2=city2, price2=price2)
+    await callback.message.edit_text(
+        f'<b>🅱️: Напишите  Улицу и № дома\n'
+        f'Например: Ленина 60</b>',
+        reply_markup=await kb.cancel_order())
+    await state.set_state(AddOrder.address2)
+
+@router.message(AddOrder.city2)
+async def city2(message: Message, state: FSMContext):
+    await message.answer('Выберите кнопку населенного пункта')
 
     # try:
     #     if message.text:
@@ -175,19 +236,40 @@ async def point_starter(message: Message, state: FSMContext):
     # await state.set_state(AddOrder.point_end)
 
 
-@router.message(AddOrder.point_start)
-async def point_start(message: Message, state: FSMContext):
-    await message.answer(f'Введите корреткно от куда едите')
-
-
-@router.message(AddOrder.point_end, F.text)
-async def point_end(message: Message, state: FSMContext):
-    await state.update_data(point_end=message.text, price=(100 + Settings.fix_price))
+# @router.message(AddOrder.point_start)
+# async def point_start(message: Message, state: FSMContext):
+#     await message.answer(f'Введите корреткно от куда едите')
+#
+#
+@router.message(AddOrder.address2, F.text)
+async def address2(message: Message, state: FSMContext):
+    await state.update_data(address2=message.text)
     data = await state.get_data()
-    await message.answer(f"<b>🅰️: Начальная точка:</b> {data['point_start']}\n\n"
-                         f"<b>🅱️: Конечная точка:</b> {data['point_end']}\n\n"
-                         f"<b>Цена:</b> {data['price']}₽",
+    point_start = f'{data["city1"]} - {data["address1"]}'
+    point_end = f'{data["city2"]} - {data["address2"]}'
+
+    price1 = data['price1']
+    price2 = data['price2']
+    price_max = max(price1, price2)
+    price = int(price_max) + Settings.fix_price
+    await message.answer(f"🅰️: Начальная точка: <b>{point_start}</b>\n\n"
+                         f"🅱️: Конечная точка: <b>{point_end}</b>\n\n"
+                         f"<b>Цена:</b> {price}₽",
                          reply_markup=await kb.order_now())
+    # await state.clear()
+    #
+    # await state.update_data(point_start=point_start, point_end=point_end, price=price)
+    # data = await state.get_data()
+    #
+    #
+    # await message.answer(f"🅰️: Начальная точка: <b>{data['point_start']}</b>\n\n"
+    #                      f"🅱️: Конечная точка: <b>{data['point_end']}</b>\n\n"
+    #                      f"<b>Цена:</b> {data['price']}₽",
+    #                      reply_markup=await kb.order_now())
+
+@router.message(AddOrder.address2)
+async def address2(message: Message, state: FSMContext):
+    await message.answer('Напишите адрес куда поедите')
 
     # try:
     #     if message.text:
@@ -228,18 +310,32 @@ async def point_end(message: Message, state: FSMContext):
     #                      f"<b>Время пути:</b> {time_way}мин\n\n"
     #                      f"<b>Цена:</b> {price}₽",
     #                      reply_markup=await kb.order_now())
-    await state.set_state(AddOrder.finish)
-
-
-@router.message(AddOrder.point_end)
-async def point_end(message: Message, state: FSMContext):
-    await message.answer('Введите корреткно куда едите')
-
-
-@router.callback_query(AddOrder.finish, F.data == 'order_now')
+#     await state.set_state(AddOrder.finish)
+#
+#
+# @router.message(AddOrder.point_end)
+# async def point_end(message: Message, state: FSMContext):
+#     await message.answer('Введите корреткно куда едите')
+#
+#
+@router.callback_query(F.data == 'order_now')
 async def finish_price(callback: CallbackQuery, state: FSMContext, bot: Bot):
     await callback.answer('')
     data = await state.get_data()
+
+    point_start = f'{data["city1"]} - {data["address1"]}'
+    point_end = f'{data["city2"]} - {data["address2"]}'
+
+    price1 = data['price1']
+    price2 = data['price2']
+    price_max = max(price1, price2)
+    price = int(price_max) + Settings.fix_price
+
+
+    await state.clear()
+    await state.update_data(point_start=point_start, point_end=point_end, price=price)
+    data = await state.get_data()
+
     user_id = await get_user(callback.from_user.id)
     order_id = await set_order(user_id.id, data)
     order_data = await get_all_orders(order_id)
@@ -260,22 +356,25 @@ async def finish_price(callback: CallbackQuery, state: FSMContext, bot: Bot):
                                      f"Цена: <b>{order_data.price}Р</b>")
 
     await state.clear()
+#
+#
+# @router.message(AddOrder.point_end)
+# async def point_end(message: Message, state: FSMContext):
+#     await message.answer('Введите корреткно куда едите')
 
 
-@router.message(AddOrder.point_end)
-async def point_end(message: Message, state: FSMContext):
-    await message.answer('Введите корреткно куда едите')
-
-
-#-------------отправка сообщения администраторам\менеджерам
+# -------------отправка сообщения администраторам\менеджерам
 class SendMessage(StatesGroup):
     send_manager = State()
+
+
 @router.message(Command('manager'))
 async def send_manager_call(message: Message, state: FSMContext):
     await state.clear()
     await state.set_state(SendMessage.send_manager)
     await message.answer(f'🖊️<b>Напишите сообщение менеджеру Такси городок</b> 🚕',
-                                     reply_markup=await kb.cancel_order())
+                         reply_markup=await kb.cancel_order())
+
 
 @router.message(SendMessage.send_manager)
 async def get_manager(message: Message, state: FSMContext, bot: Bot):
@@ -283,13 +382,13 @@ async def get_manager(message: Message, state: FSMContext, bot: Bot):
     if message.text:
         await state.update_data(send_manager=message.text)
         await bot.send_message(chat_id=os.getenv('CHAT_ID_ADMIN'),
-                             text=f'Пользователь ник нейм: <b>{message.from_user.username}</b>\n'
-                                  f'Имя: <b>{message.from_user.first_name}</b>\n'
-                                  f'CHAT ID: <b>{message.from_user.id}</b>\n'
-                                  f'Телефон: <b>+{user.phone}</b>\n'
-                                  f'------------------------------\n'
-                                  f'Сообщение:\n'
-                                  f'<i>{message.text}</i>\n')
+                               text=f'Пользователь ник нейм: <b>@{message.from_user.username}</b>\n'
+                                    f'Имя: <b>{message.from_user.first_name}</b>\n'
+                                    f'CHAT ID: <b>{message.from_user.id}</b>\n'
+                                    f'Телефон: <b>+{user.phone}</b>\n'
+                                    f'------------------------------\n'
+                                    f'Сообщение:\n'
+                                    f'<i>{message.text}</i>\n')
         await state.clear()
         await message.answer('Спасибо за сообщение. В скором времени с вами свяжется менеджер',
                              reply_markup=await kb.main())
@@ -297,10 +396,10 @@ async def get_manager(message: Message, state: FSMContext, bot: Bot):
     elif message.voice:
         await state.update_data(send_manager=message.voice)
         await bot.send_voice(chat_id=os.getenv('CHAT_ID_ADMIN'),
-                             caption=f'Пользователь ник нейм: <b>{message.from_user.username}</b>\n'
-                                  f'Имя: <b>{message.from_user.first_name}</b>\n'
-                                  f'CHAT ID: <b>{message.from_user.id}</b>\n'
-                                  f'Телефон: <b>+{user.phone}</b>\n',
+                             caption=f'Пользователь ник нейм: <b>@{message.from_user.username}</b>\n'
+                                     f'Имя: <b>{message.from_user.first_name}</b>\n'
+                                     f'CHAT ID: <b>{message.from_user.id}</b>\n'
+                                     f'Телефон: <b>+{user.phone}</b>\n',
                              voice=message.voice.file_id)
         await state.clear()
         await message.answer('Спасибо за голосовое сообщение. В скором времени с вами свяжется менеджер',

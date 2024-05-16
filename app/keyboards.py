@@ -80,7 +80,8 @@ async def on_the_spot_kb(order_id):
     keyboard = InlineKeyboardBuilder()
     keyboard.add(InlineKeyboardButton(text='На месте 🎯', callback_data=f'onthespot_{order_id}'))
     keyboard.add(InlineKeyboardButton(text='Отказаться ❌', callback_data=f'close_{order_id}'))
-    return keyboard.adjust(1, 1).as_markup()
+    keyboard.add(InlineKeyboardButton(text='Завершить ✅', callback_data=f'finish_{order_id}'))
+    return keyboard.adjust(1, 1, 1).as_markup()
 
 
 async def time_wait(order_id, message_id):
@@ -93,8 +94,9 @@ async def time_wait(order_id, message_id):
     keyboard.add(InlineKeyboardButton(text='30 мин.', callback_data=f'timewait_{order_id}_30_{message_id}'))
     keyboard.add(InlineKeyboardButton(text='На месте 🎯', callback_data=f'onthespot_{order_id}'))
     keyboard.add(InlineKeyboardButton(text='Отказаться ❌', callback_data=f'close_{order_id}'))
+    keyboard.add(InlineKeyboardButton(text='Завершить ✅', callback_data=f'finish_{order_id}'))
 
-    return keyboard.adjust(6, 1, 1).as_markup()
+    return keyboard.adjust(6, 1, 1, 1).as_markup()
 
 
 async def back_button():
@@ -126,10 +128,13 @@ async def delete_car(id):
     keyboard.add(InlineKeyboardButton(text='Удалить машину', callback_data=f'deletecar_{id}'))
     return keyboard.adjust().as_markup()
 
+
+
 async def reset_zero(driver_id):
     keyboard = InlineKeyboardBuilder()
     keyboard.add(InlineKeyboardButton(text='Обнулить', callback_data=f'resetzero_{driver_id}'))
     return keyboard.adjust().as_markup()
+
 
 async def cancel_order():
     keyboard = InlineKeyboardBuilder()

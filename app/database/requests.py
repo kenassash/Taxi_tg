@@ -98,6 +98,9 @@ async def delete_order_execution(order_id_id, driver_id_id):
             )
         )
         await session.commit()
+
+
+
 async def reset_to_zero(driver_id_id):
     async with async_session() as session:
 # ---------- обнуляем об водителе в  OnlineExecution
