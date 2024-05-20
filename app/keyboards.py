@@ -129,7 +129,6 @@ async def delete_car(id):
     return keyboard.adjust().as_markup()
 
 
-
 async def reset_zero(driver_id):
     keyboard = InlineKeyboardBuilder()
     keyboard.add(InlineKeyboardButton(text='Обнулить', callback_data=f'resetzero_{driver_id}'))
@@ -139,6 +138,13 @@ async def reset_zero(driver_id):
 async def cancel_order():
     keyboard = InlineKeyboardBuilder()
     keyboard.add(InlineKeyboardButton(text='Отменить', callback_data=f'cancelorder_'))
+    return keyboard.adjust().as_markup()
+
+
+async def delete_order(order_id):
+    keyboard = InlineKeyboardBuilder()
+    keyboard.add(InlineKeyboardButton(text='❌ Отменить заказ',
+                                      callback_data=f'deleteorder_{order_id}'))
     return keyboard.adjust().as_markup()
 
 

@@ -1,6 +1,8 @@
 import os
+from datetime import timedelta, datetime
 from typing import List
 
+import pytz
 from sqlalchemy import BigInteger, ForeignKey, String, DateTime, func, Boolean
 from sqlalchemy.orm import Mapped, mapped_column, relationship, DeclarativeBase
 from sqlalchemy.ext.asyncio import AsyncAttrs, async_sessionmaker, create_async_engine
@@ -13,9 +15,12 @@ engine = create_async_engine(url=os.getenv('ENGINE'), echo=True)
 async_session = async_sessionmaker(engine)
 
 
+
 class Base(AsyncAttrs, DeclarativeBase):
-    created: Mapped[DateTime] = mapped_column(DateTime, default=func.now())
-    updated: Mapped[DateTime] = mapped_column(DateTime, default=func.now(), onupdate=func.now())
+    timezone = pytz.timezone('Asia/Yakutsk')
+    created: Mapped[DateTime] = mapped_column(DateTime, default=datetime.now(timezone))
+    updated: Mapped[DateTime] = mapped_column(DateTime, default=datetime.now(timezone), onupdate=datetime.now(timezone))
+
 
 
 """
@@ -42,7 +47,6 @@ class Order(Base):
 
     user: Mapped[int] = mapped_column(ForeignKey('users.id'))
 
-
     point_start: Mapped[str] = mapped_column(String(200))
     point_end: Mapped[str] = mapped_column(String(200))
 
@@ -65,6 +69,7 @@ class Driver(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     tg_id = mapped_column(BigInteger)
+    name: Mapped[str] = mapped_column(String(100), nullable=True)
     phone: Mapped[int] = mapped_column(nullable=True)
     car_name: Mapped[str] = mapped_column(String(100))
     number_car: Mapped[int] = mapped_column(nullable=True)
@@ -74,6 +79,22 @@ class Driver(Base):
 
     orders_reply: Mapped[List['Order']] = relationship(back_populates='drivers_reply',
                                                        secondary='order_executions')
+
+
+class CityInside(Base):
+    __tablename__ = 'city_insides'
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    city_name: Mapped[str] = mapped_column(String(255), nullable=True)
+    price: Mapped[int] = mapped_column(nullable=True)
+
+
+class CityOutside(Base):
+    __tablename__ = 'city_outsides'
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    city_name: Mapped[str] = mapped_column(String(255), nullable=True)
+    price: Mapped[int] = mapped_column(nullable=True)
 
 
 class OnlineExecution(Base):
@@ -87,4 +108,3 @@ async def async_main():
     async with engine.begin() as conn:
         # await conn.run_sync(Base.metadata.drop_all)
         await conn.run_sync(Base.metadata.create_all)
-

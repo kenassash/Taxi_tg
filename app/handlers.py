@@ -1,10 +1,6 @@
-import hashlib
-import json
 import os
-import re
 
 from aiogram import Router, F
-from aiogram.enums import ParseMode
 from aiogram.types import Message, CallbackQuery, ReplyKeyboardRemove
 from aiogram.filters import CommandStart, or_f, Command
 from aiogram.fsm.context import FSMContext
@@ -16,9 +12,11 @@ import app.keyboards as kb
 import app.keyboard_city as kb_city
 from app.change_price import Settings
 from app.geolocation import coords_to_address, addess_to_coords
-from app.database.requests import set_user, set_order, get_all_orders, get_driver, active_driver, get_user, add_car
+from app.database.requests import set_user, set_order, get_all_orders, get_driver, active_driver, get_user, add_car, \
+    delete_order_pass, get_order_driver
 from filters.chat_type import ChatTypeFilter
 from app.calculate import length_way
+from utils.paginator import Paginator
 
 router = Router()
 router.message.filter(ChatTypeFilter(['private']))
@@ -31,22 +29,6 @@ async def cancel_order_reply(message: Message, state: FSMContext):
     await state.clear()
     await message.answer(f'Вы отменили заказ. Нажмитке /start чтоб начать поездку', reply_markup=ReplyKeyboardRemove())
 
-
-# ----------------Шаг назад---------------
-# @router.callback_query(StateFilter('*'), F.data == 'backbutton_')
-# async def backbutton(callback: CallbackQuery, state: FSMContext):
-#     current_state = await state.get_state()
-#     print(current_state)
-#
-#     previous = None
-#     for step in AddOrder.__all_states__:
-#         if step.state == current_state:
-#             await state.set_state(previous)
-#             await callback.answer('')
-#             await callback.message.edit_text(f'Вы вернулись к прошлому шагу\n{AddOrder.texts[previous.state]}\n',
-#                                              reply_markup=await kb_city.keyboard_city2())
-#             return
-#         previous = step
 
 @router.callback_query(StateFilter('*'), F.data == 'backbutton_')
 async def backbutton(callback: CallbackQuery, state: FSMContext):
@@ -63,12 +45,14 @@ async def backbutton(callback: CallbackQuery, state: FSMContext):
 
         previous = step
 
+
 # ----------------Отменить заказ---------------
 @router.callback_query(F.data.startswith('cancelorder_'))
 async def cancelorder(callback: CallbackQuery, state: FSMContext):
     await callback.answer('')
     await state.clear()
     await callback.message.delete()
+
     await callback.message.answer(f'Вы отменили')
 
 
@@ -77,15 +61,6 @@ class AddOrder(StatesGroup):
     address1 = State()
     city2 = State()
     address2 = State()
-
-    # point_start = State()
-    # point_end = State()
-    # finish = State()
-
-    # coordinat_start_x = State()
-    # coordinat_start_y = State()
-    # coordinat_end_x = State()
-    # coordinat_end_y = State()
 
     texts = {
         'AddOrder:city1': 'Выберите кнопку от куда поедите',
@@ -109,7 +84,6 @@ async def cmd_start(message: Message, state: FSMContext):
     if drivers and drivers.tg_id == message.from_user.id:
         await message.answer(f'<b>Добро пожаловать, Таксист {message.from_user.full_name}</b>😊\n\n',
                              reply_markup=await kb.driver_start_or_finish())
-        # reply_markup = await kb.driver_start_or_finish()
         return
 
     tg_id = message.from_user.id
@@ -151,7 +125,7 @@ async def process_invalid_phone(message: Message):
 
 
 @router.callback_query(F.data == 'neworder')
-async def neworder(callback: CallbackQuery, state: FSMContext, bot: Bot):
+async def neworder(callback: CallbackQuery, state: FSMContext):
     await callback.answer('')
     await callback.message.edit_text(
         f'<b>🅰️: Выберите населенный пункт от куда поедите:</b>',
@@ -159,9 +133,17 @@ async def neworder(callback: CallbackQuery, state: FSMContext, bot: Bot):
     await state.set_state(AddOrder.city1)
 
 
-@router.callback_query(AddOrder.city1, F.data.startswith('cities1_'))
-async def city1(callback: CallbackQuery, state: FSMContext, bot: Bot):
+@router.callback_query(AddOrder.city1, or_f(F.data.startswith('cities1_'),
+                                            F.data.startswith('citiesoutside1_')))
+async def city1(callback: CallbackQuery, state: FSMContext):
     await callback.answer('')
+    if callback.data.startswith('citiesoutside1_'):
+        await callback.message.edit_text(
+            f'<b>🅰️: Выберите населенный пункт от куда поедите:</b>',
+            reply_markup=await kb_city.keyboard_city3())
+        await state.set_state(AddOrder.city1)
+        return
+
     city1 = callback.data.split('_')[1]
     price1 = callback.data.split('_')[2]
     await state.update_data(city1=city1, price1=price1)
@@ -171,10 +153,10 @@ async def city1(callback: CallbackQuery, state: FSMContext, bot: Bot):
         reply_markup=await kb.cancel_order())
     await state.set_state(AddOrder.address1)
 
+
 @router.message(AddOrder.city1)
 async def city2(message: Message, state: FSMContext):
     await message.answer('Выберите кнопку населенного пункта')
-
 
 
 @router.message(AddOrder.address1, F.text)
@@ -185,13 +167,24 @@ async def address1(message: Message, state: FSMContext):
                          f'🅱️: Выберите населенный пункт куда поедите:</b>',
                          reply_markup=await kb_city.keyboard_city2())
     await state.set_state(AddOrder.city2)
+
+
 @router.message(AddOrder.address1)
 async def address1(message: Message, state: FSMContext):
     await message.answer('Напишите адрес от куда поедите')
 
-@router.callback_query(AddOrder.city2, F.data.startswith('cities2_'))
-async def city2(callback: CallbackQuery, state: FSMContext, bot: Bot):
+
+@router.callback_query(AddOrder.city2, or_f(F.data.startswith('cities2_'),
+                                            F.data.startswith('citiesoutside2_')))
+async def city2(callback: CallbackQuery, state: FSMContext):
     await callback.answer('')
+    if callback.data.startswith('citiesoutside2_'):
+        data = await state.get_data()
+        await callback.message.edit_text(f'<b>🅰️: {data["city1"]} - {data["address1"]}\n\n'
+                             f'🅱️: Выберите населенный пункт куда поедите:</b>',
+                             reply_markup=await kb_city.keyboard_city4())
+        await state.set_state(AddOrder.city2)
+        return
     city2 = callback.data.split('_')[1]
     price2 = callback.data.split('_')[2]
     await state.update_data(city2=city2, price2=price2)
@@ -201,46 +194,12 @@ async def city2(callback: CallbackQuery, state: FSMContext, bot: Bot):
         reply_markup=await kb.cancel_order())
     await state.set_state(AddOrder.address2)
 
+
 @router.message(AddOrder.city2)
 async def city2(message: Message, state: FSMContext):
     await message.answer('Выберите кнопку населенного пункта')
 
-    # try:
-    #     if message.text:
-    #         address_go = message.text
-    #         longitude_end, latitude_end, trimmed_string = await addess_to_coords(address_go)
-    #         print(trimmed_string)
-    #         print(float(longitude_end), float(latitude_end))
-    #     elif message.location:
-    #         latitude_end = message.location.latitude
-    #         longitude_end = message.location.longitude
-    #         trimmed_string = await coords_to_address(longitude_end, latitude_end)
-    #         print(float(longitude_end), float(latitude_end))
-    #         print(trimmed_string)
 
-    # except IndexError:
-    #     await message.answer('Улица и дом не корретно введены')
-    #     await state.clear()
-    #     full_name = message.from_user.full_name
-    #     await message.answer(f'<b>Добро пожаловать {full_name} </b>😊', reply_markup=await kb.main())
-    #     return
-    #
-    # await state.update_data(point_start=trimmed_string,
-    #                         coordinat_start_x=float(longitude_end),
-    #                         coordinat_start_y=float(latitude_end))
-    # data = await state.get_data()
-    # point = data.get('point_start')
-    # await message.answer(f'<b>🅰️: {point}\n\n'
-    #                      f'🅱️: Напишите куда поедите?\nНапример: Ленина 60;</b>',
-    #                      reply_markup=await kb.back_button())
-    # await state.set_state(AddOrder.point_end)
-
-
-# @router.message(AddOrder.point_start)
-# async def point_start(message: Message, state: FSMContext):
-#     await message.answer(f'Введите корреткно от куда едите')
-#
-#
 @router.message(AddOrder.address2, F.text)
 async def address2(message: Message, state: FSMContext):
     await state.update_data(address2=message.text)
@@ -250,74 +209,20 @@ async def address2(message: Message, state: FSMContext):
 
     price1 = data['price1']
     price2 = data['price2']
-    price_max = max(price1, price2)
+    print(type(price1), type(price2))
+    price_max = max(int(price1), int(price2))
     price = int(price_max) + Settings.fix_price
     await message.answer(f"🅰️: Начальная точка: <b>{point_start}</b>\n\n"
                          f"🅱️: Конечная точка: <b>{point_end}</b>\n\n"
                          f"<b>Цена:</b> {price}₽",
                          reply_markup=await kb.order_now())
-    # await state.clear()
-    #
-    # await state.update_data(point_start=point_start, point_end=point_end, price=price)
-    # data = await state.get_data()
-    #
-    #
-    # await message.answer(f"🅰️: Начальная точка: <b>{data['point_start']}</b>\n\n"
-    #                      f"🅱️: Конечная точка: <b>{data['point_end']}</b>\n\n"
-    #                      f"<b>Цена:</b> {data['price']}₽",
-    #                      reply_markup=await kb.order_now())
+
 
 @router.message(AddOrder.address2)
-async def address2(message: Message, state: FSMContext):
+async def address2(message: Message):
     await message.answer('Напишите адрес куда поедите')
 
-    # try:
-    #     if message.text:
-    #         address_go = message.text
-    #         longitude_end, latitude_end, trimmed_string = await addess_to_coords(address_go)
-    #         print(trimmed_string)
-    #         print(float(longitude_end), float(latitude_end))
-    #     elif message.location:
-    #         latitude_end = message.location.latitude
-    #         longitude_end = message.location.longitude
-    #         trimmed_string = await coords_to_address(longitude_end, latitude_end)
-    #         print(float(longitude_end), float(latitude_end))
-    #         print(trimmed_string)
-    # except IndexError:
-    #     await message.answer('Улица и дом не корретно')
-    #     await state.clear()
-    #     full_name = message.from_user.full_name
-    #     await message.answer(f'<b>Добро пожаловать {full_name} </b>😊', reply_markup=await kb.main())
-    #     return
-    # await state.update_data(point_end=trimmed_string,
-    #                         coordinat_end_x=float(longitude_end),
-    #                         coordinat_end_y=float(latitude_end))
 
-    # point = data.get('point_start')
-    # end = data.get('point_end')
-    # await message.answer(f'<b>🅰️: {point}\n\n'
-    #                      f'🅱️: {end}\n\n</b>',
-    #                      reply_markup=await kb.back_button())
-    # data = await state.get_data()
-    # distance, time_way, price = await length_way(data['coordinat_start_x'],
-    #                                              data['coordinat_start_y'],
-    #                                              data['coordinat_end_x'],
-    #                                              data['coordinat_end_y'])
-    # await state.update_data(distance=distance, time_way=time_way, price=price)
-    # await message.answer(f"<b>🅰️: Начальная точка:</b> {data['point_start']}\n\n"
-    #                      f"<b>🅱️: Конечная точка:</b> {data['point_end']}\n\n"
-    #                      f"<b>Расстояние:</b> {distance}км\n\n"
-    #                      f"<b>Время пути:</b> {time_way}мин\n\n"
-    #                      f"<b>Цена:</b> {price}₽",
-    #                      reply_markup=await kb.order_now())
-#     await state.set_state(AddOrder.finish)
-#
-#
-# @router.message(AddOrder.point_end)
-# async def point_end(message: Message, state: FSMContext):
-#     await message.answer('Введите корреткно куда едите')
-#
-#
 @router.callback_query(F.data == 'order_now')
 async def finish_price(callback: CallbackQuery, state: FSMContext, bot: Bot):
     await callback.answer('')
@@ -330,7 +235,6 @@ async def finish_price(callback: CallbackQuery, state: FSMContext, bot: Bot):
     price2 = data['price2']
     price_max = max(price1, price2)
     price = int(price_max) + Settings.fix_price
-
 
     await state.clear()
     await state.update_data(point_start=point_start, point_end=point_end, price=price)
@@ -353,14 +257,21 @@ async def finish_price(callback: CallbackQuery, state: FSMContext, bot: Bot):
                                      f"Конечная точка: <b>{order_data.point_end}</b>\n\n"
                                      # f"<b>Расстояние:</b> {order_data.distance}км\n\n"
                                      # f"<b>Время пути:</b> {order_data.time_way}мин\n\n"
-                                     f"Цена: <b>{order_data.price}Р</b>")
+                                     f"Цена: <b>{order_data.price}Р</b>",
+                                     reply_markup=await kb.delete_order(order_id))
 
     await state.clear()
-#
-#
-# @router.message(AddOrder.point_end)
-# async def point_end(message: Message, state: FSMContext):
-#     await message.answer('Введите корреткно куда едите')
+
+
+@router.callback_query(F.data.startswith('deleteorder_'))
+async def delete_order_passager(callback: CallbackQuery, bot: Bot):
+    await callback.answer('')
+    order_id = callback.data.split('_')[1]
+    driver_id = await get_order_driver(order_id)
+    if driver_id is not None:
+        await bot.send_message(chat_id=driver_id.tg_id, text='Пассажир отменил заказ')
+    await delete_order_pass(order_id)
+    await callback.message.edit_text('Заказ отменен')
 
 
 # -------------отправка сообщения администраторам\менеджерам
