@@ -19,6 +19,10 @@ async def get_users():
     async with async_session() as sesssion:
         users = await sesssion.scalars(select(User))
         return users
+async def get_order(order_id):
+    async with async_session() as sesssion:
+        order = await sesssion.scalar(select(Order).where(Order.id == order_id))
+        return order
 
 
 async def get_cities_inside():
@@ -188,13 +192,31 @@ async def get_order_driver(order_id):
         query_driver = (
             select(Order)
             .options(
-                selectinload(Order.drivers_reply)  # Загрузка связанных водителей
+                selectinload(Order.drivers_reply),  # Загрузка связанных водителей
+
             )
             .where(Order.id == order_id)
         )
         result_driver = await session.execute(query_driver)
         order = result_driver.scalar()
-        if order and order.drivers_reply:
-            driver = order.drivers_reply[0]  # Предполагаем, что выбираем первого водителя из списка
-            return driver
+        if order:
+            return order
         return None
+
+
+async def up_price_passager(order_id, price_passager):
+    async with async_session() as session:
+        await session.execute(update(Order)
+                                     .where(Order.id == order_id)
+                                     .values(price=Order.price + price_passager)
+                                     )
+        await session.commit()
+        result = await session.execute(
+            select(Order)
+            .options(selectinload(Order.user_rel))
+            .where(Order.id == order_id)
+        )
+        order_instance = result.scalar_one_or_none()
+        await session.refresh(order_instance)
+        return order_instance
+

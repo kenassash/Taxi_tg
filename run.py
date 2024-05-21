@@ -7,8 +7,9 @@ from aiogram.enums import ParseMode
 from dotenv import load_dotenv
 
 from app.database.models import async_main
-from app.handlers import router
+from handlers.handlers import router
 from app.common import menu, admin_menu
+from handlers.driver_handlers import driver_router
 
 from handlers.user_group import user_group_router
 from app.admin import admin
@@ -22,7 +23,7 @@ async def main():
     dp = Dispatcher()
     await bot.set_my_commands(commands=menu, scope=types.BotCommandScopeAllPrivateChats())
     await bot.set_my_commands(commands=admin_menu, scope=types.BotCommandScopeChat(chat_id=os.getenv('CHAT_ID_ADMIN')))
-    dp.include_routers(admin, user_group_router, router)
+    dp.include_routers(admin, user_group_router, router, driver_router)
     await dp.start_polling(bot)
 
 

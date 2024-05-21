@@ -13,7 +13,7 @@ import app.keyboard_city as kb_city
 from app.change_price import Settings
 from app.geolocation import coords_to_address, addess_to_coords
 from app.database.requests import set_user, set_order, get_all_orders, get_driver, active_driver, get_user, add_car, \
-    delete_order_pass, get_order_driver
+    delete_order_pass, get_order_driver, up_price_passager, get_order
 from filters.chat_type import ChatTypeFilter
 from app.calculate import length_way
 from utils.paginator import Paginator
@@ -209,7 +209,6 @@ async def address2(message: Message, state: FSMContext):
 
     price1 = data['price1']
     price2 = data['price2']
-    print(type(price1), type(price2))
     price_max = max(int(price1), int(price2))
     price = int(price_max) + Settings.fix_price
     await message.answer(f"🅰️: Начальная точка: <b>{point_start}</b>\n\n"
@@ -221,7 +220,6 @@ async def address2(message: Message, state: FSMContext):
 @router.message(AddOrder.address2)
 async def address2(message: Message):
     await message.answer('Напишите адрес куда поедите')
-
 
 @router.callback_query(F.data == 'order_now')
 async def finish_price(callback: CallbackQuery, state: FSMContext, bot: Bot):
@@ -243,7 +241,17 @@ async def finish_price(callback: CallbackQuery, state: FSMContext, bot: Bot):
     user_id = await get_user(callback.from_user.id)
     order_id = await set_order(user_id.id, data)
     order_data = await get_all_orders(order_id)
-    await bot.send_message(chat_id=os.getenv('CHAT_GROUP_ID'),
+
+    sent_driver_message = await callback.message.edit_text(f"<b>Ожидайте водителя⌛</b>\n\n"
+                                     f"Начальная точка: <b>{order_data.point_start}</b>\n\n"
+                                     f"Конечная точка: <b>{order_data.point_end}</b>\n\n"
+                                     # f"<b>Расстояние:</b> {order_data.distance}км\n\n"
+                                     # f"<b>Время пути:</b> {order_data.time_way}мин\n\n"
+                                     f"Цена: <b>{order_data.price}Р</b>",
+                                     reply_markup=await kb.up_price(order_id))
+
+
+    sent_message = await bot.send_message(chat_id=os.getenv('CHAT_GROUP_ID'),
                            text=f"Заказ <b>{order_id}</b>\n\n"
                                 f"Телефон <b>+{user_id.phone}</b>\n\n"
                                 f"Начальная точка: <b>{order_data.point_start}</b>\n\n"
@@ -251,27 +259,58 @@ async def finish_price(callback: CallbackQuery, state: FSMContext, bot: Bot):
                            # f"<b>Расстояние:</b> {order_data.distance}км\n\n"
                            # f"<b>Время пути:</b> {order_data.time_way}мин\n\n"
                                 f"Цена: <b>{order_data.price}Р</b>",
-                           reply_markup=await kb.accept(order_id, callback.message.message_id))
-    await callback.message.edit_text(f"<b>Ожидайте водителя⌛</b>\n\n"
-                                     f"Начальная точка: <b>{order_data.point_start}</b>\n\n"
-                                     f"Конечная точка: <b>{order_data.point_end}</b>\n\n"
+                           reply_markup=await kb.accept(order_id, sent_driver_message.message_id))
+    print(type(sent_driver_message.message_id))
+    await state.clear()
+    await state.update_data(message_id=sent_message.message_id)
+
+
+
+
+
+# @router.callback_query(F.data.startswith('deleteorder_'))
+# async def delete_order_passager(callback: CallbackQuery, bot: Bot, state: FSMContext):
+#     await callback.answer('')
+#     order_id = callback.data.split('_')[1]
+#     driver_id = await get_order_driver(order_id)
+#     if driver_id is not None:
+#         await bot.send_message(chat_id=driver_id.drivers_reply.tg_id, text='Пассажир отменил заказ')
+#     await delete_order_pass(order_id)
+#     await callback.message.answer('Заказ отменен')
+#     await state.clear()
+
+@router.callback_query(F.data.startswith('upprice_'))
+async def upprice_order_passager(callback: CallbackQuery, bot: Bot, state: FSMContext):
+    await callback.answer('')
+    order_id_id = callback.data.split('_')[1]
+    state_data = await state.get_data()
+    message_id = state_data.get('message_id')
+    print(message_id)
+
+    price = 20
+    order_id = await up_price_passager(order_id_id, price)
+
+
+    message_id_driver = await callback.message.edit_text(f"<b>Ожидайте водителя⌛</b>\n\n"
+                                     f"Начальная точка: <b>{order_id.point_start}</b>\n\n"
+                                     f"Конечная точка: <b>{order_id.point_end}</b>\n\n"
                                      # f"<b>Расстояние:</b> {order_data.distance}км\n\n"
                                      # f"<b>Время пути:</b> {order_data.time_way}мин\n\n"
-                                     f"Цена: <b>{order_data.price}Р</b>",
-                                     reply_markup=await kb.delete_order(order_id))
+                                     f"Цена: <b>{order_id.price}Р</b>",
+                                     reply_markup=await kb.up_price(order_id.id))
 
-    await state.clear()
+    await bot.edit_message_text(chat_id=os.getenv('CHAT_GROUP_ID'),
+                                message_id=message_id,
+                           text=f"Заказ <b>{order_id.id}</b>\n\n"
+                                f"Телефон <b>+{order_id.user_rel.phone}</b>\n\n"
+                                f"Начальная точка: <b>{order_id.point_start}</b>\n\n"
+                                f"Конечная точка: <b>{order_id.point_end}</b>\n\n"
+                           # f"<b>Расстояние:</b> {order_data.distance}км\n\n"
+                           # f"<b>Время пути:</b> {order_data.time_way}мин\n\n"
+                                f"Цена: <b>{order_id.price}Р</b>",
+                           reply_markup=await kb.accept(order_id.id, message_id_driver.message_id))
 
 
-@router.callback_query(F.data.startswith('deleteorder_'))
-async def delete_order_passager(callback: CallbackQuery, bot: Bot):
-    await callback.answer('')
-    order_id = callback.data.split('_')[1]
-    driver_id = await get_order_driver(order_id)
-    if driver_id is not None:
-        await bot.send_message(chat_id=driver_id.tg_id, text='Пассажир отменил заказ')
-    await delete_order_pass(order_id)
-    await callback.message.edit_text('Заказ отменен')
 
 
 # -------------отправка сообщения администраторам\менеджерам
@@ -410,3 +449,5 @@ async def add_item_category(message: Message, state: FSMContext, bot: Bot):
 @router.message(AddDrivercar.photo_car)
 async def phone(message: Message, state: FSMContext):
     await message.answer('Отправь фото корректно')
+
+
