@@ -81,13 +81,13 @@ from app.database.requests import get_cities_inside, get_cities_outside
 #     "Ясная Поляна": 1600
 # }
 
+
 # cities = {
 #     "Екатеринославка": 150,
 #     "Таёжный": 200,
 #     "Полигон": 350,
 #     "Восточный за ж/д": 200,
 #     "Агрохолдинг": 300,
-#     "Другой нп(список)": '',
 # }
 
 
@@ -114,6 +114,7 @@ async def keyboard_city2():
     keyboard.add(InlineKeyboardButton(text='Назад', callback_data=f'backbutton_'))
     return keyboard.adjust(2).as_markup()
 
+
 async def keyboard_city3():
     keyboard = InlineKeyboardBuilder()
     cities = await get_cities_outside()
@@ -123,6 +124,7 @@ async def keyboard_city3():
     keyboard.add(InlineKeyboardButton(text='Отменить', callback_data=f'cancelorder_'))
     keyboard.add(InlineKeyboardButton(text='Назад', callback_data=f'backbutton_'))
     return keyboard.adjust(2).as_markup()
+
 
 async def keyboard_city4():
     keyboard = InlineKeyboardBuilder()

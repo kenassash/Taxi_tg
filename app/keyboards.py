@@ -20,15 +20,6 @@ async def order_now():
     return keyboard.adjust(2, 1, 1).as_markup()
 
 
-async def admin_keyboard():
-    keyboard = InlineKeyboardBuilder()
-    keyboard.add(InlineKeyboardButton(text='Добавить автомобиль', callback_data='add_car'))
-    keyboard.add(InlineKeyboardButton(text='Удалить автомобиль', callback_data='delete_car'))
-    keyboard.add(InlineKeyboardButton(text='Информация', callback_data='info'))
-    keyboard.add(InlineKeyboardButton(text='Рассылка пользователям', callback_data='newletter'))
-    keyboard.add(InlineKeyboardButton(text='Поменять тариф', callback_data='change_settings'))
-    return keyboard.adjust(2).as_markup()
-
 
 async def admin_change_price():
     keyboard = InlineKeyboardBuilder()
@@ -125,10 +116,6 @@ async def go_to_order():
     return keyboard.adjust().as_markup()
 
 
-async def delete_car(id):
-    keyboard = InlineKeyboardBuilder()
-    keyboard.add(InlineKeyboardButton(text='Удалить машину', callback_data=f'deletecar_{id}'))
-    return keyboard.adjust().as_markup()
 
 
 async def reset_zero(driver_id):
@@ -164,11 +151,4 @@ async def add_car_or_no(id):
     return keyboard.adjust().as_markup()
 
 
-async def all_car():
-    drivers = await get_all_car()
-    keyboard = InlineKeyboardBuilder()
-    for driver in drivers:
-        keyboard.add(InlineKeyboardButton(text=f'{driver.number_car}',
-                                          callback_data=f'infocardriver_{driver.id}'))
-    keyboard.add(InlineKeyboardButton(text='Отменить', callback_data=f'cancelorder_'))
-    return keyboard.adjust(2).as_markup()
+

@@ -12,11 +12,12 @@ import app.keyboards as kb
 import app.keyboard_city as kb_city
 from app.change_price import Settings
 from app.geolocation import coords_to_address, addess_to_coords
-from app.database.requests import set_user, set_order, get_all_orders, get_driver, active_driver, get_user, add_car, \
-    delete_order_pass, get_order_driver, up_price_passager, get_order
+from app.database.requests import set_user, set_order, get_all_orders, get_driver, active_driver, get_user, add_car,\
+    up_price_passager
 from filters.chat_type import ChatTypeFilter
 from app.calculate import length_way
-from utils.paginator import Paginator
+from middleware.ban_decorator import user_not_banned
+
 
 router = Router()
 router.message.filter(ChatTypeFilter(['private']))
@@ -76,6 +77,7 @@ class AddUser(StatesGroup):
 
 
 @router.message(CommandStart())
+@user_not_banned
 async def cmd_start(message: Message, state: FSMContext):
     await state.clear()
 
@@ -181,8 +183,8 @@ async def city2(callback: CallbackQuery, state: FSMContext):
     if callback.data.startswith('citiesoutside2_'):
         data = await state.get_data()
         await callback.message.edit_text(f'<b>🅰️: {data["city1"]} - {data["address1"]}\n\n'
-                             f'🅱️: Выберите населенный пункт куда поедите:</b>',
-                             reply_markup=await kb_city.keyboard_city4())
+                                         f'🅱️: Выберите населенный пункт куда поедите:</b>',
+                                         reply_markup=await kb_city.keyboard_city4())
         await state.set_state(AddOrder.city2)
         return
     city2 = callback.data.split('_')[1]
@@ -221,6 +223,7 @@ async def address2(message: Message, state: FSMContext):
 async def address2(message: Message):
     await message.answer('Напишите адрес куда поедите')
 
+
 @router.callback_query(F.data == 'order_now')
 async def finish_price(callback: CallbackQuery, state: FSMContext, bot: Bot):
     await callback.answer('')
@@ -243,29 +246,24 @@ async def finish_price(callback: CallbackQuery, state: FSMContext, bot: Bot):
     order_data = await get_all_orders(order_id)
 
     sent_driver_message = await callback.message.edit_text(f"<b>Ожидайте водителя⌛</b>\n\n"
-                                     f"Начальная точка: <b>{order_data.point_start}</b>\n\n"
-                                     f"Конечная точка: <b>{order_data.point_end}</b>\n\n"
-                                     # f"<b>Расстояние:</b> {order_data.distance}км\n\n"
-                                     # f"<b>Время пути:</b> {order_data.time_way}мин\n\n"
-                                     f"Цена: <b>{order_data.price}Р</b>",
-                                     reply_markup=await kb.up_price(order_id))
-
+                                                           f"Начальная точка: <b>{order_data.point_start}</b>\n\n"
+                                                           f"Конечная точка: <b>{order_data.point_end}</b>\n\n"
+                                                           # f"<b>Расстояние:</b> {order_data.distance}км\n\n"
+                                                           # f"<b>Время пути:</b> {order_data.time_way}мин\n\n"
+                                                           f"Цена: <b>{order_data.price}Р</b>",
+                                                           reply_markup=await kb.up_price(order_id))
 
     sent_message = await bot.send_message(chat_id=os.getenv('CHAT_GROUP_ID'),
-                           text=f"Заказ <b>{order_id}</b>\n\n"
-                                f"Телефон <b>+{user_id.phone}</b>\n\n"
-                                f"Начальная точка: <b>{order_data.point_start}</b>\n\n"
-                                f"Конечная точка: <b>{order_data.point_end}</b>\n\n"
-                           # f"<b>Расстояние:</b> {order_data.distance}км\n\n"
-                           # f"<b>Время пути:</b> {order_data.time_way}мин\n\n"
-                                f"Цена: <b>{order_data.price}Р</b>",
-                           reply_markup=await kb.accept(order_id, sent_driver_message.message_id))
-    print(type(sent_driver_message.message_id))
+                                          text=f"Заказ <b>{order_id}</b>\n\n"
+                                               f"Телефон <b>+{user_id.phone}</b>\n\n"
+                                               f"Начальная точка: <b>{order_data.point_start}</b>\n\n"
+                                               f"Конечная точка: <b>{order_data.point_end}</b>\n\n"
+                                          # f"<b>Расстояние:</b> {order_data.distance}км\n\n"
+                                          # f"<b>Время пути:</b> {order_data.time_way}мин\n\n"
+                                               f"Цена: <b>{order_data.price}Р</b>",
+                                          reply_markup=await kb.accept(order_id, sent_driver_message.message_id))
     await state.clear()
     await state.update_data(message_id=sent_message.message_id)
-
-
-
 
 
 # @router.callback_query(F.data.startswith('deleteorder_'))
@@ -290,27 +288,24 @@ async def upprice_order_passager(callback: CallbackQuery, bot: Bot, state: FSMCo
     price = 20
     order_id = await up_price_passager(order_id_id, price)
 
-
     message_id_driver = await callback.message.edit_text(f"<b>Ожидайте водителя⌛</b>\n\n"
-                                     f"Начальная точка: <b>{order_id.point_start}</b>\n\n"
-                                     f"Конечная точка: <b>{order_id.point_end}</b>\n\n"
-                                     # f"<b>Расстояние:</b> {order_data.distance}км\n\n"
-                                     # f"<b>Время пути:</b> {order_data.time_way}мин\n\n"
-                                     f"Цена: <b>{order_id.price}Р</b>",
-                                     reply_markup=await kb.up_price(order_id.id))
+                                                         f"Начальная точка: <b>{order_id.point_start}</b>\n\n"
+                                                         f"Конечная точка: <b>{order_id.point_end}</b>\n\n"
+                                                         # f"<b>Расстояние:</b> {order_data.distance}км\n\n"
+                                                         # f"<b>Время пути:</b> {order_data.time_way}мин\n\n"
+                                                         f"Цена: <b>{order_id.price}Р</b>",
+                                                         reply_markup=await kb.up_price(order_id.id))
 
     await bot.edit_message_text(chat_id=os.getenv('CHAT_GROUP_ID'),
                                 message_id=message_id,
-                           text=f"Заказ <b>{order_id.id}</b>\n\n"
-                                f"Телефон <b>+{order_id.user_rel.phone}</b>\n\n"
-                                f"Начальная точка: <b>{order_id.point_start}</b>\n\n"
-                                f"Конечная точка: <b>{order_id.point_end}</b>\n\n"
-                           # f"<b>Расстояние:</b> {order_data.distance}км\n\n"
-                           # f"<b>Время пути:</b> {order_data.time_way}мин\n\n"
-                                f"Цена: <b>{order_id.price}Р</b>",
-                           reply_markup=await kb.accept(order_id.id, message_id_driver.message_id))
-
-
+                                text=f"Заказ <b>{order_id.id}</b>\n\n"
+                                     f"Телефон <b>+{order_id.user_rel.phone}</b>\n\n"
+                                     f"Начальная точка: <b>{order_id.point_start}</b>\n\n"
+                                     f"Конечная точка: <b>{order_id.point_end}</b>\n\n"
+                                # f"<b>Расстояние:</b> {order_data.distance}км\n\n"
+                                # f"<b>Время пути:</b> {order_data.time_way}мин\n\n"
+                                     f"Цена: <b>{order_id.price}Р</b>",
+                                reply_markup=await kb.accept(order_id.id, message_id_driver.message_id))
 
 
 # -------------отправка сообщения администраторам\менеджерам
@@ -379,6 +374,7 @@ async def driver_finish(callback: CallbackQuery):
 
 class AddDrivercar(StatesGroup):
     phone = State()
+    name = State()
     car_name = State()
     number_car = State()
     photo_car = State()
@@ -387,19 +383,32 @@ class AddDrivercar(StatesGroup):
 @router.message(Command('add_car'))
 async def add_phone1(message: Message, state: FSMContext):
     await state.set_state(AddDrivercar.phone)
-    await message.answer('Отправь номер телефона', reply_markup=await kb.cancel_order())
+    await message.answer('Отправь номер телефона с помощью кнопки', reply_markup=await kb.phone())
 
 
-@router.message(AddDrivercar.phone, F.text)
-async def add_car_name(message: Message, state: FSMContext):
-    await state.update_data(phone=message.text)
-    await state.set_state(AddDrivercar.car_name)
-    await message.answer('Введите название марки машины', reply_markup=await kb.cancel_order())
+@router.message(AddDrivercar.phone, F.contact)
+async def add_name(message: Message, state: FSMContext):
+    phone_number = message.contact.phone_number
+    await state.update_data(phone=phone_number)
+    await state.set_state(AddDrivercar.name)
+    await message.answer('Как зовут водителя', reply_markup=await kb.cancel_order())
 
 
 @router.message(AddDrivercar.phone)
 async def add_phone2(message: Message, state: FSMContext):
     await message.answer('Отправь телефон через кнопку')
+
+
+@router.message(AddDrivercar.name, F.text)
+async def add_car_name(message: Message, state: FSMContext):
+    await state.update_data(name=message.text)
+    await state.set_state(AddDrivercar.car_name)
+    await message.answer('Введите название марки машины', reply_markup=await kb.cancel_order())
+
+
+@router.message(AddDrivercar.name)
+async def add_phone2(message: Message, state: FSMContext):
+    await message.answer('Отправь как зовут водителя')
 
 
 @router.message(AddDrivercar.car_name, F.text)
@@ -440,6 +449,7 @@ async def add_item_category(message: Message, state: FSMContext, bot: Bot):
                          photo=data['photo_car'],
                          caption=f'Ргеистрация автомобиля\n\n'
                                  f'Телефон:<b> {data["phone"]}</b>\n\n'
+                                 f'Имя:<b> {data["name"]}</b>\n\n'
                                  f'Название машины: <b>{data["car_name"]}</b>\n\n'
                                  f'Номер машины: <b>{data["number_car"]}Р</b>',
                          reply_markup=await kb.add_car_or_no(driver_id))
@@ -449,5 +459,3 @@ async def add_item_category(message: Message, state: FSMContext, bot: Bot):
 @router.message(AddDrivercar.photo_car)
 async def phone(message: Message, state: FSMContext):
     await message.answer('Отправь фото корректно')
-
-

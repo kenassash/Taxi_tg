@@ -10,7 +10,7 @@ from app.change_price import Settings
 from filters.chat_type import ChatTypeFilter
 from aiogram import Bot
 import app.keyboards as kb
-from app.database.requests import get_all_orders, get_driver, start_order_execution, delete_order_execution
+from app.database.requests import get_all_orders, get_driver, start_order_execution, delete_order_execution, test_driver
 
 user_group_router = Router()
 user_group_router.message.filter(ChatTypeFilter(['group', 'supergroup']))
@@ -33,6 +33,9 @@ load_dotenv()
 # async def cmd_start(message: Message):
 #     await message.answer(f'{message.chat.id}')
 
+@user_group_router.message(CommandStart())
+async def cmd_start(message: Message):
+    await test_driver()
 
 @user_group_router.callback_query(F.data.startswith('accept_'))
 async def accept(callback: CallbackQuery, bot: Bot, state: FSMContext):
@@ -41,6 +44,12 @@ async def accept(callback: CallbackQuery, bot: Bot, state: FSMContext):
         order_id = await get_all_orders(callback.data.split('_')[1])
         message_id_pass = callback.data.split('_')[2]
         driver = await get_driver(callback.from_user.id)
+        if not driver.active:
+            await bot.send_message(chat_id=callback.from_user.id,
+                                   text=f"Вы не активны и не можете принимать заказы.\n"
+                                        f"Нажмите /start и выйдите на линию")
+            return
+
         # сообщение id предыдущее (ожидание чтоб удалить)
 
         # Создаем запись о начале выполнения заказа

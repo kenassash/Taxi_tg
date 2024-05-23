@@ -15,12 +15,10 @@ engine = create_async_engine(url=os.getenv('ENGINE'), echo=True)
 async_session = async_sessionmaker(engine)
 
 
-
 class Base(AsyncAttrs, DeclarativeBase):
     timezone = pytz.timezone('Asia/Yakutsk')
     created: Mapped[DateTime] = mapped_column(DateTime, default=datetime.now(timezone))
     updated: Mapped[DateTime] = mapped_column(DateTime, default=datetime.now(timezone), onupdate=datetime.now(timezone))
-
 
 
 """
@@ -36,6 +34,8 @@ class User(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     tg_id = mapped_column(BigInteger)
     phone: Mapped[int] = mapped_column(nullable=True)
+
+    banned: Mapped[bool] = mapped_column(Boolean, default=False)
 
     order_rel: Mapped[List['Order']] = relationship(back_populates='user_rel')
 
@@ -71,7 +71,7 @@ class Driver(Base):
     tg_id = mapped_column(BigInteger)
     name: Mapped[str] = mapped_column(String(100), nullable=True)
     phone: Mapped[int] = mapped_column(nullable=True)
-    car_name: Mapped[str] = mapped_column(String(100))
+    car_name: Mapped[str] = mapped_column(String(100), nullable=True)
     number_car: Mapped[int] = mapped_column(nullable=True)
     photo_car: Mapped[str] = mapped_column(String(150), nullable=True)
 

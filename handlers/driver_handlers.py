@@ -14,7 +14,6 @@ driver_router.message.filter(ChatTypeFilter(['private']))
 load_dotenv()
 
 
-
 @driver_router.callback_query(F.data.startswith('close_'))
 async def close(callback: CallbackQuery, bot: Bot):
     try:
@@ -26,12 +25,11 @@ async def close(callback: CallbackQuery, bot: Bot):
         # Удаляем запись запись о начале выполнения заказа
         await delete_order_execution(order_id.id, driver_id.id)
 
-
         await bot.delete_message(chat_id=order_id.user_rel.tg_id, message_id=message_id)
         message_id_pass = await bot.send_message(chat_id=order_id.user_rel.tg_id,
-                               text=f'Ожидайте ⌛\n'
-                                    f'Будет назначен новый водитель в ближайшее время\n',
-                               reply_markup=await kb.delete_order(order_id.id))
+                                                 text=f'Ожидайте ⌛\n'
+                                                      f'Будет назначен новый водитель в ближайшее время\n',
+                                                 reply_markup=await kb.delete_order(order_id.id))
         await bot.send_message(chat_id=os.getenv('CHAT_GROUP_ID'),
                                text=f'Водитель {callback.from_user.first_name} отменил выпонление заказа\n'
                                     f"Телефон <b>+{order_id.user_rel.phone}</b>\n\n"
@@ -110,7 +108,6 @@ async def on_the_spot(callback: CallbackQuery, bot: Bot):
 
         await bot.delete_message(chat_id=order_id.user_rel.tg_id, message_id=message_id)
 
-
         # await bot.send_message(chat_id=order_id.user_rel.tg_id,
         #                        text=f'<b>Водитель приехал за вами ✅🚕</b>\n\n',
         #                        reply_markup=await kb.delete_order(order_id.id)
@@ -152,14 +149,11 @@ async def finish(callback: CallbackQuery, bot: Bot):
 
         # Извлечение данных из состояния
 
-
         # Удаляем сообщение, если идентификатор существует
         # if sent_message_id:
         #     await bot.delete_message(chat_id=callback.message.chat.id, message_id=sent_message_id)
         #     # Очищаем состояние
         #     await state.update_data(sent_message_id=None)
-
-
 
         # await callback.message.edit_text(f'Заказ выполнен {order_id.id}')
         # await bot.send_message(chat_id=os.getenv('CHAT_GROUP_ID'),
@@ -182,8 +176,13 @@ async def delete_order_passager(callback: CallbackQuery, bot: Bot, state: FSMCon
     await callback.message.answer('Заказ отменен')
     order_id = callback.data.split('_')[1]
     driver_id = await get_order_driver(order_id)
-    if driver_id is not None:
+
+    # Проверка, если список drivers_reply пуст
+    if not driver_id.drivers_reply:
+        await callback.message.answer('Нет водителей для данного заказа')
+    else:
         driver = driver_id.drivers_reply[0]
         await bot.send_message(chat_id=driver.tg_id, text='Пассажир отменил заказ')
+
     await delete_order_pass(order_id)
     await state.clear()

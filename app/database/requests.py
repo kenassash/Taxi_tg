@@ -19,6 +19,8 @@ async def get_users():
     async with async_session() as sesssion:
         users = await sesssion.scalars(select(User))
         return users
+
+
 async def get_order(order_id):
     async with async_session() as sesssion:
         order = await sesssion.scalar(select(Order).where(Order.id == order_id))
@@ -94,6 +96,19 @@ async def get_one_car(id):
     async with async_session() as session:
         driver = await session.scalar(select(Driver).where(Driver.id == id))
         return driver
+
+
+async def update_car(data):
+    async with async_session() as session:
+        driver_id = data.pop('driver_id')  # Извлекаем driver_id и удаляем его из словаря
+        query = (
+            update(Driver)
+            .where(Driver.id == driver_id)
+            .values(**data)
+            .execution_options(synchronize_session="fetch")
+        )
+        await session.execute(query)
+        await session.commit()
 
 
 async def remove_car(id):
@@ -207,9 +222,9 @@ async def get_order_driver(order_id):
 async def up_price_passager(order_id, price_passager):
     async with async_session() as session:
         await session.execute(update(Order)
-                                     .where(Order.id == order_id)
-                                     .values(price=Order.price + price_passager)
-                                     )
+                              .where(Order.id == order_id)
+                              .values(price=Order.price + price_passager)
+                              )
         await session.commit()
         result = await session.execute(
             select(Order)
@@ -220,3 +235,135 @@ async def up_price_passager(order_id, price_passager):
         await session.refresh(order_instance)
         return order_instance
 
+
+async def get_users_count():
+    async with async_session() as session:
+        stmt = select(User)
+        result = await session.execute(stmt)
+        count = len(result.all())
+        return count
+
+
+async def update_price_count():
+    async with async_session() as session:
+        stmt = select(User)
+        result = await session.execute(stmt)
+        count = len(result.all())
+        return count
+
+
+async def add_change_price(price, city, database):
+    async with async_session() as session:
+        if database == "inside":
+            # Обновляем цену в таблице CityInside
+            query = update(CityInside).where(CityInside.city_name == city).values(price=price)
+        elif database == "outside":
+            # Обновляем цену в таблице CityOutside
+            query = update(CityOutside).where(CityOutside.city_name == city).values(price=price)
+        else:
+            # Обработка других случаев
+            pass
+
+        # Выполняем запрос
+        await session.execute(query)
+
+        # Сохраняем изменения в базе данных
+        await session.commit()
+
+
+async def ban_user(phone, banned_id):
+    async with async_session() as session:
+        # Обновляем поле "banned" для пользователя с заданным tg_id
+        await session.execute(update(User).where(User.phone == phone).values(banned=banned_id))
+        await session.commit()
+
+
+async def check_user_banned(user_id):
+    async with async_session() as session:
+        # Выполняем запрос к базе данных для получения статуса блокировки пользователя
+        user = await session.execute(select(User.banned).filter_by(tg_id=user_id))
+        user_banned = user.scalar()
+
+    return user_banned
+
+
+locations = {
+    "Анновка": 2700,
+    "Архара": 5800,
+    "Аэропорт": 5500,
+    "Борисоглебка": 1800,
+    "Благовещенск": 4800,
+    "Белогорск": 3500,
+    "Беляковка": 1900,
+    "Березовка": 4300,
+    "Верхнебелое": 1400,
+    "Владимировка": 4500,
+    "Вознесеновка": 2300,
+    "Высокое": 1500,
+    "Возжаевка": 2300,
+    "Варваровка": 1800,
+    "Георгиевка": 800,  # исправлено с 1400
+    "Долдыкан": 3200,
+    "Дальневосточное": 1300,
+    "Зорино": 800,
+    "Завитинск": 1600,
+    "Знаменка": 1500,
+    "Серышево": 4200,
+    "Трудовой": 1900,
+    "Талакан": 4200,
+    "Тамбовка": 3200,
+    "Ивановка": 3500,
+    "Ильиновка": 2300,
+    "Короли (федералка)": 850,
+    "Короли": 700,
+    "Козьмодемьяновка": 2000,
+    "Каховка": 2350,
+    "Кутилово": 1400,
+    "Климовка": 2300,
+    "Любимое": 1800,
+    "Максимовка": 1200,
+    "МПС (нефть)": 750,
+    "Мухинский": 1300,
+    "Марьяновка": 1100,
+    "Морозова": 2000,
+    "Николо-Александровка": 1700,
+    "Нагорный": 400,
+    "Новомихайловка": 850,
+    "Заречное (Белогорский р-он)": 2600,
+    "Преображеновка": 1400,
+    "Прогресс": 4200,
+    "Песчаноозёрка": 1400,
+    "Поярково": 4200,
+    "Поздеевка (федералка)": 1800,
+    "Переяславка": 1000,
+    "Прибрежный": 450,
+    "Покровка": 1500,
+    "Панино": 250,
+    "Романовка": 750,
+    "Ромны": 2000,
+    "Райчихинск": 3500,
+    "Рогозовка": 1700,
+    "Смелое": 1200,
+    "Среднебелая": 4500,
+    "Сергеев-Фёдоровка": 1000,
+    "Свободный": 6000,
+    "Смирновка (федералка)": 1200,
+    "Святорусовка": 1200,
+    "Солнечное": 4500,  # исправлено с 4000
+    "Новоросийка": 1800,
+    "Новобурейский": 3500,
+    "Новокиевский Увал": 6500,
+    "Урожайное": 750,
+    "Чигири": 4800,
+    "Черёмушки": 1200,
+    "Шимановск": 8600,
+    "Харьковка": 140,  # исправлено
+    "Южное": 200,  # исправлено с 400
+    "Ерковцы": 2200,
+    "Ясная Поляна": 1600
+}
+async def test_driver():
+    async with async_session() as session:
+        for city, price in locations.items():
+            session.add(CityOutside(city_name=city, price=price))
+        await session.commit()
