@@ -12,11 +12,12 @@ import app.keyboards as kb
 import app.keyboard_city as kb_city
 from app.change_price import Settings
 from app.geolocation import coords_to_address, addess_to_coords
-from app.database.requests import set_user, set_order, get_all_orders, get_driver, active_driver, get_user, add_car,\
-    up_price_passager
+from app.database.requests import set_user, set_order, get_all_orders, get_driver, active_driver, get_user, add_car, \
+    up_price_passager, shop_add
 from filters.chat_type import ChatTypeFilter
 from app.calculate import length_way
 from middleware.ban_decorator import user_not_banned
+from middleware.shop_decorator import shop_decorator
 
 
 router = Router()
@@ -78,6 +79,7 @@ class AddUser(StatesGroup):
 
 @router.message(CommandStart())
 @user_not_banned
+@shop_decorator
 async def cmd_start(message: Message, state: FSMContext):
     await state.clear()
 
@@ -459,3 +461,24 @@ async def add_item_category(message: Message, state: FSMContext, bot: Bot):
 @router.message(AddDrivercar.photo_car)
 async def phone(message: Message, state: FSMContext):
     await message.answer('Отправь фото корректно')
+
+
+class AddShop(StatesGroup):
+    shop_name = State()
+
+
+@router.message(Command('add_shop'))
+async def add_shop(message: Message, state: FSMContext):
+    await state.set_state(AddShop.shop_name)
+    await message.answer('Напишите название магазина', reply_markup=await kb.cancel_order())
+
+@router.message(AddShop.shop_name, F.text)
+async def add_shop(message: Message, state: FSMContext):
+    if message.text:
+        data = await state.update_data(shop_name=message.text)
+        user_id = message.from_user.id
+        await shop_add(user_id, shop_activate=True, shop_name=data['shop_name'])
+        await message.answer('Магазин успешно добавлен')
+        await state.clear()
+    else:
+        await message.answer('Введите корретно название магазина')

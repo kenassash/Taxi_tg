@@ -10,6 +10,11 @@ async def main():
     keyboard.add(InlineKeyboardButton(text='Создать заказ 🏎️', callback_data='neworder'))
     return keyboard.adjust().as_markup()
 
+async def shop_order():
+    keyboard = InlineKeyboardBuilder()
+    keyboard.add(InlineKeyboardButton(text='Создать заказ 🏎️', callback_data='shoporder'))
+    return keyboard.adjust().as_markup()
+
 
 async def order_now():
     keyboard = InlineKeyboardBuilder()

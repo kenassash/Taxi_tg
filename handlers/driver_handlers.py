@@ -31,7 +31,7 @@ async def close(callback: CallbackQuery, bot: Bot):
                                                       f'Будет назначен новый водитель в ближайшее время\n',
                                                  reply_markup=await kb.delete_order(order_id.id))
         await bot.send_message(chat_id=os.getenv('CHAT_GROUP_ID'),
-                               text=f'Водитель {callback.from_user.first_name} отменил выпонление заказа\n'
+                               text=f'Водитель {driver_id.name} отменил выпонление заказа\n'
                                     f"Телефон <b>+{order_id.user_rel.phone}</b>\n\n"
                                     f"Начальная точка: <b>{order_id.point_start}</b>\n\n"
                                     f"Конечная точка: <b>{order_id.point_end}</b>\n\n"

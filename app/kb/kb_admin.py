@@ -16,12 +16,14 @@ async def admin_keyboard():
     keyboard.add(InlineKeyboardButton(text='На линии', callback_data='online'))
     return keyboard.adjust(2).as_markup()
 
+
 async def car_menu_keyboard():
     keyboard = InlineKeyboardBuilder()
     keyboard.add(InlineKeyboardButton(text='Добавить', callback_data='add_car'))
     keyboard.add(InlineKeyboardButton(text='Изменить', callback_data='edit_car'))
     keyboard.add(InlineKeyboardButton(text='Удалить', callback_data='delete_car'))
     return keyboard.adjust(3).as_markup()
+
 
 async def edit_car():
     drivers = await get_all_car()
@@ -30,7 +32,8 @@ async def edit_car():
         keyboard.add(InlineKeyboardButton(text=f'{driver.name} - {driver.number_car}',
                                           callback_data=f'editcar_{driver.id}'))
     keyboard.add(InlineKeyboardButton(text='Отменить', callback_data=f'cancelorder_'))
-    return keyboard.adjust().as_markup()
+    return keyboard.adjust(2).as_markup()
+
 
 async def delete_car():
     drivers = await get_all_car()
@@ -39,7 +42,7 @@ async def delete_car():
         keyboard.add(InlineKeyboardButton(text=f'{driver.name} - {driver.number_car}',
                                           callback_data=f'deletecar_{driver.id}'))
     keyboard.add(InlineKeyboardButton(text='Отменить', callback_data=f'cancelorder_'))
-    return keyboard.adjust().as_markup()
+    return keyboard.adjust(2).as_markup()
 
 
 async def all_car():
@@ -51,12 +54,14 @@ async def all_car():
     keyboard.add(InlineKeyboardButton(text='Отменить', callback_data=f'cancelorder_'))
     return keyboard.adjust(2).as_markup()
 
+
 async def change_money():
     keyboard = InlineKeyboardBuilder()
     keyboard.add(InlineKeyboardButton(text=f'Местно', callback_data=f'changeinside'))
     keyboard.add(InlineKeyboardButton(text='Другой нп', callback_data=f'changeoutside'))
     keyboard.add(InlineKeyboardButton(text='Отменить', callback_data=f'cancelorder_'))
     return keyboard.adjust(2).as_markup()
+
 
 async def change_mouney_inside():
     keyboard = InlineKeyboardBuilder()
@@ -67,6 +72,7 @@ async def change_mouney_inside():
     keyboard.add(InlineKeyboardButton(text='Отменить', callback_data=f'cancelorder_'))
     return keyboard.adjust(2).as_markup()
 
+
 async def change_mouney_outside():
     keyboard = InlineKeyboardBuilder()
     cities = await get_cities_outside()
@@ -76,13 +82,11 @@ async def change_mouney_outside():
     keyboard.add(InlineKeyboardButton(text='Отменить', callback_data=f'cancelorder_'))
     return keyboard.adjust(2).as_markup()
 
+
 async def ban_users_phone():
     keyboard = InlineKeyboardBuilder()
     keyboard.add(InlineKeyboardButton(text='Забанить', callback_data=f'ban_add'))
     keyboard.add(InlineKeyboardButton(text='Разбанить', callback_data=f'ban_no'))
+    keyboard.add(InlineKeyboardButton(text='Список', callback_data=f'ban_list'))
     keyboard.add(InlineKeyboardButton(text='Отменить', callback_data=f'cancelorder_'))
     return keyboard.adjust(2).as_markup()
-
-
-
-

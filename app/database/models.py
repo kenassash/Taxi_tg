@@ -1,8 +1,6 @@
 import os
-from datetime import timedelta, datetime
 from typing import List
 
-import pytz
 from sqlalchemy import BigInteger, ForeignKey, String, DateTime, func, Boolean
 from sqlalchemy.orm import Mapped, mapped_column, relationship, DeclarativeBase
 from sqlalchemy.ext.asyncio import AsyncAttrs, async_sessionmaker, create_async_engine
@@ -16,9 +14,8 @@ async_session = async_sessionmaker(engine)
 
 
 class Base(AsyncAttrs, DeclarativeBase):
-    timezone = pytz.timezone('Asia/Yakutsk')
-    created: Mapped[DateTime] = mapped_column(DateTime, default=datetime.now(timezone))
-    updated: Mapped[DateTime] = mapped_column(DateTime, default=datetime.now(timezone), onupdate=datetime.now(timezone))
+    created: Mapped[DateTime] = mapped_column(DateTime, default=func.now())
+    updated: Mapped[DateTime] = mapped_column(DateTime, default=func.now(), onupdate=func.now())
 
 
 """
@@ -37,6 +34,9 @@ class User(Base):
 
     banned: Mapped[bool] = mapped_column(Boolean, default=False)
 
+    shop_activate: Mapped[bool] = mapped_column(Boolean, default=False)
+    shop_name: Mapped[str] = mapped_column(String(255), nullable=True)
+
     order_rel: Mapped[List['Order']] = relationship(back_populates='user_rel')
 
 
@@ -47,8 +47,8 @@ class Order(Base):
 
     user: Mapped[int] = mapped_column(ForeignKey('users.id'))
 
-    point_start: Mapped[str] = mapped_column(String(200))
-    point_end: Mapped[str] = mapped_column(String(200))
+    point_start: Mapped[str] = mapped_column(String(200), nullable=True)
+    point_end: Mapped[str] = mapped_column(String(200), nullable=True)
 
     distance: Mapped[int] = mapped_column(nullable=True)
     time_way: Mapped[int] = mapped_column(nullable=True)

@@ -12,7 +12,7 @@ from aiogram.fsm.state import State, StatesGroup
 from app.change_price import Settings
 from app.database.requests import add_car, get_all_car, remove_car, print_all_online_executions, \
     get_all_drivers_with_update_date, get_users, get_one_car, get_driver_info, reset_to_zero, update_car, \
-    get_users_count, add_change_price, ban_user
+    get_users_count, add_change_price, ban_user, get_ban_all_user
 
 import app.keyboards as kb
 import app.kb.kb_admin as kb_admin
@@ -169,7 +169,8 @@ async def edit_car_1(callback: CallbackQuery, state: FSMContext):
     await state.update_data(driver_id=driver.id)
     await callback.message.answer(f'Введите что хотите изменить\n'
                                   f'Например: Номер M404BH\n'
-                                  f'Или: Фото и после пришлите фото')
+                                  f'Или: Фото и после пришлите фото',
+                                  reply_markup=await kb.cancel_order())
     await state.set_state(EditCarStates.waiting_for_new_value)
 
 
@@ -240,7 +241,7 @@ async def delete_car_callback(callback: CallbackQuery):
     await callback.message.edit_text('Машина удалена')
 
 
-#------------------вывод таблицы онлайн-----------------------
+# ------------------вывод таблицы онлайн-----------------------
 @admin.callback_query(IsAdmin(), F.data == 'online')
 async def admin_features(callback: CallbackQuery):
     await callback.answer('')
@@ -251,11 +252,11 @@ async def admin_features(callback: CallbackQuery):
 
     for driver in active_drivers:
         await callback.message.answer(f'Активные водители:\n'
-                                      f'Машина {driver.car_name} - {driver.number_car} Дата обновления {driver.updated}')
+                                      f'Машина {driver.car_name} - {driver.number_car} Дата обновления {driver.updated + timedelta(hours=9)}')
 
     for driver in inactive_drivers:
         await callback.message.answer(f'Неактивные водители:\n'
-                                      f'Машина {driver.car_name} - {driver.number_car} Дата обновления {driver.updated}')
+                                      f'Машина {driver.car_name} - {driver.number_car} Дата обновления {driver.updated + timedelta(hours=9)}')
 
     # online_executions = await print_all_online_executions()
     # for online_execution in online_executions:
@@ -270,7 +271,8 @@ async def admin_features(callback: CallbackQuery):
     #                                       f"Время пути:{order.time_way}мин\n"
     #                                       f"Цена: {order.price}")
 
-#--------------рассылка сообщений всем пользователям-------------
+
+# --------------рассылка сообщений всем пользователям-------------
 class Newsletter(StatesGroup):
     message = State()
 
@@ -439,7 +441,7 @@ async def info_car_driver(callback: CallbackQuery):
         # Создаем словарь для хранения количества заказов по датам
         orders_by_date = {}
         for order in driver_info.orders_reply:
-            date = order.created.date()
+            date = order.created.date() + timedelta(hours=9)
             orders_by_date[date] = orders_by_date.get(date, 0) + 1
 
         # Добавляем информацию о количестве заказов по датам в текст сообщения
@@ -470,18 +472,32 @@ async def ban_users(callback: CallbackQuery, state: FSMContext):
     await callback.message.answer('Выберите действие ❌',
                                   reply_markup=await kb_admin.ban_users_phone())
 
-@admin.callback_query(IsAdmin(), or_f(F.data == 'ban_add', F.data == 'ban_no'))
+
+@admin.callback_query(IsAdmin(), or_f(F.data == 'ban_add', F.data == 'ban_no', F.data == 'ban_list'))
 async def ban_users2(callback: CallbackQuery, state: FSMContext):
     await callback.answer('')
     if callback.data == 'ban_add':
         await callback.message.answer('Введите номер телефона кого нужно забанить в формате 79991115577\n'
-                                  'Без знака плюс')
+                                      'Без знака плюс', reply_markup=await kb.cancel_order())
         await state.update_data(banned=True)
     elif callback.data == 'ban_no':
         await callback.message.answer('Введите номер телефона кого нужно забанить в формате 79991115577\n'
-                                      'Без знака плюс')
+                                      'Без знака плюс', reply_markup=await kb.cancel_order())
+
         await state.update_data(banned=False)
+    elif callback.data == 'ban_list':
+        results = await get_ban_all_user()
+        message_text = (
+            f'Лист забаненных пользователей\n\n'
+        )
+        for result in results:
+            message_text += f'{result.phone}\n'
+
+
+        await callback.message.answer(message_text)
+        return
     await state.set_state(BanUser.banned)
+
 
 @admin.message(IsAdmin(), BanUser.banned, F.text)
 async def ban_users3(message: Message, state: FSMContext):
