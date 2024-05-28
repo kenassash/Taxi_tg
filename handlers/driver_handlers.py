@@ -31,7 +31,7 @@ async def close(callback: CallbackQuery, bot: Bot):
                                                       f'Будет назначен новый водитель в ближайшее время\n',
                                                  reply_markup=await kb.delete_order(order_id.id))
         await bot.send_message(chat_id=os.getenv('CHAT_GROUP_ID'),
-                               text=f'Водитель {driver_id.name} отменил выпонление заказа\n'
+                               text=f'Водитель {driver_id.name} отменил выпонлнение заказа\n'
                                     f"Телефон <b>+{order_id.user_rel.phone}</b>\n\n"
                                     f"Начальная точка: <b>{order_id.point_start}</b>\n\n"
                                     f"Конечная точка: <b>{order_id.point_end}</b>\n\n"
@@ -60,10 +60,7 @@ async def timewait(callback: CallbackQuery, bot: Bot):
 
         await bot.delete_message(chat_id=order_id.user_rel.tg_id, message_id=message_id)
 
-        # await bot.send_message(chat_id=order_id.user_rel.tg_id,
-        #                        text=f'Водитель принял ваше предложение 🤝\n\n'
-        #                             f'Будет у вас через <b>{time_wait} мин.</b>',
-        #                        reply_markup=await kb.delete_order(order_id.id))
+
         message_pass = await bot.send_photo(chat_id=order_id.user_rel.tg_id,
                                             photo=driver.photo_car,
                                             caption=f'Номер телефона:<b> +{driver.phone}</b>\n\n'
@@ -73,17 +70,7 @@ async def timewait(callback: CallbackQuery, bot: Bot):
                                                     f'Будет у вас через <b>{time_wait} мин.</b>',
                                             reply_markup=await kb.delete_order(order_id.id))
 
-        # await bot.send_photo(chat_id=order_id.user_rel.tg_id,
-        #                      photo=driver.photo_car,
-        #                      caption=f'Водитель принял ваше предложение 🤝\n\n'
-        #                              f'Номер телефона:<b> +{driver.phone}</b>\n\n'
-        #                              f'Автомобиль:<b> {driver.car_name}</b>\n\n'
-        #                              f'Номер: <b>{driver.number_car}</b>\n\n'
-        #                              f'Цена поездки: <b>{order_id.price}Р</b>\n\n'
-        #                              f'Будет у вас через {time_wait} мин.')
-        # await bot.send_message(chat_id=callback.from_user.id,
-        #                        text='принять или завершить',
-        #                        reply_markup=await kb.close_and_finish(order_id.id))
+
         await callback.message.edit_text(f"Заказ <b>{order_id.id}</b>\n\n"
                                          f"Телефон <b>+{order_id.user_rel.phone}</b>\n\n"
                                          f"Начальная точка: <b>{order_id.point_start}</b>\n\n"
@@ -108,14 +95,6 @@ async def on_the_spot(callback: CallbackQuery, bot: Bot):
 
         await bot.delete_message(chat_id=order_id.user_rel.tg_id, message_id=message_id)
 
-        # await bot.send_message(chat_id=order_id.user_rel.tg_id,
-        #                        text=f'<b>Водитель приехал за вами ✅🚕</b>\n\n',
-        #                        reply_markup=await kb.delete_order(order_id.id)
-        #                        # f'Номер телефона:<b> +{driver.phone}</b>\n\n'
-        #                        # f'Автомобиль:<b> {driver.car_name}</b>\n\n'
-        #                        # f'Номер: <b>{driver.number_car}</b>\n\n'
-        #                        # f'Цена поездки: <b>{order_id.price}Р</b>\n\n',
-        #                        )
         message_pass = await bot.send_photo(chat_id=order_id.user_rel.tg_id,
                                             photo=driver.photo_car,
                                             caption=f'<b>Водитель приехал за вами ✅🚕</b>\n\n'
@@ -147,18 +126,7 @@ async def finish(callback: CallbackQuery, bot: Bot):
         # Удаляем запись запись о начале выполнения заказа
         # await delete_order_execution(order_id.id, driver_id.id)
 
-        # Извлечение данных из состояния
 
-        # Удаляем сообщение, если идентификатор существует
-        # if sent_message_id:
-        #     await bot.delete_message(chat_id=callback.message.chat.id, message_id=sent_message_id)
-        #     # Очищаем состояние
-        #     await state.update_data(sent_message_id=None)
-
-        # await callback.message.edit_text(f'Заказ выполнен {order_id.id}')
-        # await bot.send_message(chat_id=os.getenv('CHAT_GROUP_ID'),
-        #                        text=f"Заказ № {order_id.id} выполнен ✅\n\n"
-        #                             f"Водителем {callback.from_user.first_name}")
         await bot.delete_message(chat_id=order_id.user_rel.tg_id, message_id=message_id_pass)
         await bot.send_message(chat_id=order_id.user_rel.tg_id,
                                text=f'Заказ выполнен✅.\n'

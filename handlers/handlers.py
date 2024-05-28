@@ -16,12 +16,19 @@ from app.database.requests import set_user, set_order, get_all_orders, get_drive
     up_price_passager, shop_add
 from filters.chat_type import ChatTypeFilter
 from app.calculate import length_way
-from middleware.ban_decorator import user_not_banned
-from middleware.shop_decorator import shop_decorator
+from middleware.ban_middleware import CheckUserBannedMiddleware
+from middleware.shop_middleware import ShopMiddleware
+
+# from middleware.ban_decorator import user_not_banned
+# from middleware.shop_decorator import shop_decorator
 
 
 router = Router()
 router.message.filter(ChatTypeFilter(['private']))
+
+router.message.middleware(CheckUserBannedMiddleware())
+router.message.middleware(ShopMiddleware())
+
 load_dotenv()
 
 
@@ -78,8 +85,8 @@ class AddUser(StatesGroup):
 
 
 @router.message(CommandStart())
-@user_not_banned
-@shop_decorator
+# @user_not_banned
+# @shop_decorator
 async def cmd_start(message: Message, state: FSMContext):
     await state.clear()
 
@@ -132,7 +139,7 @@ async def process_invalid_phone(message: Message):
 async def neworder(callback: CallbackQuery, state: FSMContext):
     await callback.answer('')
     await callback.message.edit_text(
-        f'<b>🅰️: Выберите населенный пункт от куда поедите:</b>',
+        f'<b>🅰️: Выберите населенный пункт откуда поедите:</b>',
         reply_markup=await kb_city.keyboard_city1())
     await state.set_state(AddOrder.city1)
 
@@ -143,7 +150,7 @@ async def city1(callback: CallbackQuery, state: FSMContext):
     await callback.answer('')
     if callback.data.startswith('citiesoutside1_'):
         await callback.message.edit_text(
-            f'<b>🅰️: Выберите населенный пункт от куда поедите:</b>',
+            f'<b>🅰️: Выберите населенный пункт откуда поедите:</b>',
             reply_markup=await kb_city.keyboard_city3())
         await state.set_state(AddOrder.city1)
         return
@@ -175,7 +182,7 @@ async def address1(message: Message, state: FSMContext):
 
 @router.message(AddOrder.address1)
 async def address1(message: Message, state: FSMContext):
-    await message.answer('Напишите адрес от куда поедите')
+    await message.answer('Напишите адрес откуда поедите')
 
 
 @router.callback_query(AddOrder.city2, or_f(F.data.startswith('cities2_'),
