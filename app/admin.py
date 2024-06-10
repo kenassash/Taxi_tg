@@ -1,7 +1,7 @@
 import json
 import os
 import re
-from datetime import timedelta
+from datetime import timedelta, time
 
 from aiogram import Router, F, Bot
 from aiogram.types import Message, CallbackQuery, ReplyKeyboardRemove
@@ -17,6 +17,10 @@ from app.database.requests import add_car, get_all_car, remove_car, print_all_on
 import app.keyboards as kb
 import app.kb.kb_admin as kb_admin
 from filters.chat_type import ChatTypeFilter, IsAdmin
+from handlers.handlers import router
+from middleware.time_restriction_middleware import TimeRestrictionMiddleware
+
+time_restriction_middleware_instance = router.message.middleware(TimeRestrictionMiddleware())
 
 admin = Router()
 admin.message.filter(ChatTypeFilter(["private"]), IsAdmin())
@@ -42,6 +46,27 @@ async def admin_features(message: Message):
     # for i in test:
     #     await message.answer(i)
     await message.answer("Что хотите сделать?", reply_markup=await kb_admin.admin_keyboard())
+
+
+# -----------------Время сна---------------
+
+@admin.callback_query(IsAdmin(), F.data == 'time_restriction')
+async def time_restriction(callback: CallbackQuery):
+    await callback.answer('')
+    await callback.message.answer('Действие 💤', reply_markup=await kb_admin.turn_time_rest())
+
+
+@admin.callback_query(IsAdmin(), F.data.startswith('turntimerest_'))
+async def turn_or_of_timerest(callback: CallbackQuery):
+    await callback.answer('')
+    answer = callback.data.split('_')[1]
+
+    if answer == 'YES':
+        time_restriction_middleware_instance.activate()
+        await callback.message.answer("Ограничение времени отправки сообщений активировано.")
+    elif answer == 'NO':
+        time_restriction_middleware_instance.deactivate()
+        await callback.message.answer("Ограничение времени отправки сообщений деактивировано.")
 
 
 # ------------------Меню машин-----------------------
@@ -493,7 +518,6 @@ async def ban_users2(callback: CallbackQuery, state: FSMContext):
         for result in results:
             message_text += f'{result.phone}\n'
 
-
         await callback.message.answer(message_text)
         return
     await state.set_state(BanUser.banned)
@@ -511,3 +535,32 @@ async def ban_users3(message: Message, state: FSMContext):
         await state.clear()
     else:
         await message.answer("Введите номер телефона  в формате 79991115577")
+
+
+# --- Отвтеить на  заявку  Администратору-----
+class SendToUser(StatesGroup):
+    sendTouser = State()
+
+
+@admin.callback_query(IsAdmin(), F.data == 'sendTouser')
+async def sendTouser(callback: CallbackQuery, state: FSMContext):
+    await callback.answer('')
+    await callback.message.answer('Напишите ответ используя модулем "Ответить"')
+    await state.set_state(SendToUser.sendTouser)
+
+
+@admin.message(IsAdmin(), SendToUser.sendTouser, F.text)
+async def send_user(message: Message, state: FSMContext, bot: Bot):
+    if (message.reply_to_message):
+        try:
+            user_id = message.reply_to_message.text.split('"')[1]
+            await bot.send_message(user_id, f'Ответ от менеджера:\n\n<b>{message.text}</b>')
+            await message.answer('Сообщение отправлено')
+            await state.clear()
+        except IndexError:
+            await message.reply(
+                "Не удалось извлечь идентификатор пользователя. Пожалуйста, убедитесь, что вы отвечаете на правильное сообщение.")
+            await state.clear()
+    else:
+        await message.answer('Используй кнопку ответить на сообщение')
+        await state.set_state(SendToUser.sendTouser)

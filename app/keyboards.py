@@ -10,10 +10,7 @@ async def main():
     keyboard.add(InlineKeyboardButton(text='Создать заказ 🏎️', callback_data='neworder'))
     return keyboard.adjust().as_markup()
 
-async def shop_order():
-    keyboard = InlineKeyboardBuilder()
-    keyboard.add(InlineKeyboardButton(text='Создать заказ 🏎️', callback_data='shoporder'))
-    return keyboard.adjust().as_markup()
+
 
 
 async def order_now():
@@ -23,7 +20,6 @@ async def order_now():
     # keyboard.add(InlineKeyboardButton(text='Написать менеджеру', callback_data='manadger'))
     keyboard.add(InlineKeyboardButton(text='Заказать', callback_data='order_now'))
     return keyboard.adjust(2, 1, 1).as_markup()
-
 
 
 async def admin_change_price():
@@ -76,9 +72,9 @@ async def on_the_spot_kb(order_id, message_id):
     keyboard = InlineKeyboardBuilder()
     keyboard.add(InlineKeyboardButton(text='На месте 🎯', callback_data=f'onthespot_{order_id}_{message_id}'))
     keyboard.add(InlineKeyboardButton(text='Отказаться 🤦‍♂️', callback_data=f'close_{order_id}_{message_id}'))
-    keyboard.add(InlineKeyboardButton(text='Отменить заказ ❌', callback_data=f'deleteorder_{order_id}'))
+    # keyboard.add(InlineKeyboardButton(text='Отменить заказ ❌', callback_data=f'deleteorder_{order_id}_{message_id}'))
     keyboard.add(InlineKeyboardButton(text='Завершить ✅', callback_data=f'finish_{order_id}_{message_id}'))
-    return keyboard.adjust(1, 2, 1).as_markup()
+    return keyboard.adjust(1, 1, 1).as_markup()
 
 
 async def time_wait(order_id, messege_id):
@@ -91,10 +87,10 @@ async def time_wait(order_id, messege_id):
     keyboard.add(InlineKeyboardButton(text='30 мин.', callback_data=f'timewait_{order_id}_30_{messege_id}'))
     keyboard.add(InlineKeyboardButton(text='На месте 🎯', callback_data=f'onthespot_{order_id}_{messege_id}'))
     keyboard.add(InlineKeyboardButton(text='Отказаться 🤦‍♂️', callback_data=f'close_{order_id}_{messege_id}'))
-    keyboard.add(InlineKeyboardButton(text='Отменить заказ ❌', callback_data=f'deleteorder_{order_id}'))
+    # keyboard.add(InlineKeyboardButton(text='Отменить заказ ❌', callback_data=f'deleteorder_{order_id}_{messege_id}'))
     keyboard.add(InlineKeyboardButton(text='Завершить ✅', callback_data=f'finish_{order_id}_{messege_id}'))
 
-    return keyboard.adjust(6, 1, 2, 1).as_markup()
+    return keyboard.adjust(6, 1, 1, 1).as_markup()
 
 
 async def back_button():
@@ -107,8 +103,8 @@ async def back_button():
 
 async def driver_start_or_finish():
     keyboard = InlineKeyboardBuilder()
-    keyboard.add(InlineKeyboardButton(text='Выйти на линию', callback_data=f'driverstart_'))
-    keyboard.add(InlineKeyboardButton(text='Уйти с линии', callback_data=f'driverfinish_'))
+    # keyboard.add(InlineKeyboardButton(text='Выйти на линию', callback_data=f'driverstart_'))
+    # keyboard.add(InlineKeyboardButton(text='Уйти с линии', callback_data=f'driverfinish_'))
     keyboard.add(InlineKeyboardButton(text='Создать заказ 🏎️', callback_data='neworder'))
 
     return keyboard.adjust(2).as_markup()
@@ -119,8 +115,6 @@ async def go_to_order():
     url_group = 'https://t.me/Taxi_gorodok_bot'
     keyboard.add(InlineKeyboardButton(text='Перейти к заказу', url=url_group))
     return keyboard.adjust().as_markup()
-
-
 
 
 async def reset_zero(driver_id):
@@ -135,11 +129,12 @@ async def cancel_order():
     return keyboard.adjust().as_markup()
 
 
-async def delete_order(order_id):
+async def delete_order(order_id, message_id):
     keyboard = InlineKeyboardBuilder()
     keyboard.add(InlineKeyboardButton(text='❌ Отменить заказ',
-                                      callback_data=f'deleteorder_{order_id}'))
+                                      callback_data=f'deleteorder_{order_id}_{message_id}'))
     return keyboard.adjust().as_markup()
+
 
 async def up_price(order_id):
     keyboard = InlineKeyboardBuilder()
@@ -149,11 +144,9 @@ async def up_price(order_id):
                                       callback_data=f'deleteorder_{order_id}'))
     return keyboard.adjust(1, 1).as_markup()
 
+
 async def add_car_or_no(id):
     keyboard = InlineKeyboardBuilder()
     keyboard.add(InlineKeyboardButton(text='Принять', callback_data=f'addcaradmin_{id}_YES'))
     keyboard.add(InlineKeyboardButton(text='Отказаться', callback_data=f'addcaradmin_{id}_NO'))
     return keyboard.adjust().as_markup()
-
-
-

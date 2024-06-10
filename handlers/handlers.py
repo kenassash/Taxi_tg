@@ -1,4 +1,5 @@
 import os
+from datetime import time
 
 from aiogram import Router, F
 from aiogram.types import Message, CallbackQuery, ReplyKeyboardRemove
@@ -9,18 +10,17 @@ from aiogram import Bot
 from dotenv import load_dotenv
 
 import app.keyboards as kb
+import app.kb.kb_admin as kb_ad
+
 import app.keyboard_city as kb_city
 from app.change_price import Settings
 from app.geolocation import coords_to_address, addess_to_coords
 from app.database.requests import set_user, set_order, get_all_orders, get_driver, active_driver, get_user, add_car, \
-    up_price_passager, shop_add
+    up_price_passager, shop_add, get_order_driver, delete_order_pass
 from filters.chat_type import ChatTypeFilter
 from app.calculate import length_way
 from middleware.ban_middleware import CheckUserBannedMiddleware
 from middleware.shop_middleware import ShopMiddleware
-
-# from middleware.ban_decorator import user_not_banned
-# from middleware.shop_decorator import shop_decorator
 
 
 router = Router()
@@ -72,10 +72,10 @@ class AddOrder(StatesGroup):
     address2 = State()
 
     texts = {
-        'AddOrder:city1': 'Выберите кнопку от куда поедите',
+        'AddOrder:city1': 'Выберите кнопку откуда поедите',
         'AddOrder:address1': 'Напишите адрес куда поедите',
         'AddOrder:city2': 'Выберите кнопку куда поедите',
-        'AddOrder:address2': 'Напишите адрес от куда поедите',
+        'AddOrder:address2': 'Напишите адрес откуда поедите',
 
     }
 
@@ -85,8 +85,6 @@ class AddUser(StatesGroup):
 
 
 @router.message(CommandStart())
-# @user_not_banned
-# @shop_decorator
 async def cmd_start(message: Message, state: FSMContext):
     await state.clear()
 
@@ -275,16 +273,42 @@ async def finish_price(callback: CallbackQuery, state: FSMContext, bot: Bot):
     await state.update_data(message_id=sent_message.message_id)
 
 
-# @router.callback_query(F.data.startswith('deleteorder_'))
-# async def delete_order_passager(callback: CallbackQuery, bot: Bot, state: FSMContext):
-#     await callback.answer('')
-#     order_id = callback.data.split('_')[1]
-#     driver_id = await get_order_driver(order_id)
-#     if driver_id is not None:
-#         await bot.send_message(chat_id=driver_id.drivers_reply.tg_id, text='Пассажир отменил заказ')
-#     await delete_order_pass(order_id)
-#     await callback.message.answer('Заказ отменен')
-#     await state.clear()
+# ---- отменить заказ----
+@router.callback_query(F.data.startswith('deleteorder_'))
+async def delete_order_passager(callback: CallbackQuery, bot: Bot, state: FSMContext):
+    await callback.answer('')
+    order_id = callback.data.split('_')[1]
+    state_data = await state.get_data()
+    message_id = state_data.get('message_id')
+    driver_id = await get_order_driver(order_id)
+    if driver_id.drivers_reply:
+        driver = driver_id.drivers_reply[0]
+        message_id_driver = callback.data.split('_')[2]
+        await bot.edit_message_text(chat_id=driver.tg_id,
+                                    message_id=message_id_driver,
+                                    text=f"Пассажир отменил заказ")
+        await callback.message.delete()
+        await callback.message.answer(f'Заказ отменен')
+
+        await delete_order_pass(order_id)
+        await state.clear()
+        return
+    await callback.message.edit_text(f'Заказ отменен',
+                                     reply_markup=await kb.main())
+    await bot.edit_message_text(chat_id=os.getenv('CHAT_GROUP_ID'),
+                                message_id=message_id,
+                                text=f"Пассажир отменил заказ")
+
+    # # Проверка, если список drivers_reply пуст
+    # if not driver_id.drivers_reply:
+    #     await callback.message.answer('Нет водителей для данного заказа')
+    # else:
+    #     driver = driver_id.drivers_reply[0]
+    #     await bot.send_message(chat_id=driver.tg_id, text='Пассажир отменил заказ')
+
+    await delete_order_pass(order_id)
+    await state.clear()
+
 
 @router.callback_query(F.data.startswith('upprice_'))
 async def upprice_order_passager(callback: CallbackQuery, bot: Bot, state: FSMContext):
@@ -305,16 +329,17 @@ async def upprice_order_passager(callback: CallbackQuery, bot: Bot, state: FSMCo
                                                          f"Цена: <b>{order_id.price}Р</b>",
                                                          reply_markup=await kb.up_price(order_id.id))
 
-    await bot.edit_message_text(chat_id=os.getenv('CHAT_GROUP_ID'),
-                                message_id=message_id,
-                                text=f"Заказ <b>{order_id.id}</b>\n\n"
-                                     f"Телефон <b>+{order_id.user_rel.phone}</b>\n\n"
-                                     f"Начальная точка: <b>{order_id.point_start}</b>\n\n"
-                                     f"Конечная точка: <b>{order_id.point_end}</b>\n\n"
-                                # f"<b>Расстояние:</b> {order_data.distance}км\n\n"
-                                # f"<b>Время пути:</b> {order_data.time_way}мин\n\n"
-                                     f"Цена: <b>{order_id.price}Р</b>",
-                                reply_markup=await kb.accept(order_id.id, message_id_driver.message_id))
+    message_id_pass = await bot.edit_message_text(chat_id=os.getenv('CHAT_GROUP_ID'),
+                                                  message_id=message_id,
+                                                  text=f"Заказ <b>{order_id.id}</b>\n\n"
+                                                       f"Телефон <b>+{order_id.user_rel.phone}</b>\n\n"
+                                                       f"Начальная точка: <b>{order_id.point_start}</b>\n\n"
+                                                       f"Конечная точка: <b>{order_id.point_end}</b>\n\n"
+                                                  # f"<b>Расстояние:</b> {order_data.distance}км\n\n"
+                                                  # f"<b>Время пути:</b> {order_data.time_way}мин\n\n"
+                                                       f"Цена: <b>{order_id.price}Р</b>",
+                                                  reply_markup=await kb.accept(order_id.id,
+                                                                               message_id_driver.message_id))
 
 
 # -------------отправка сообщения администраторам\менеджерам
@@ -336,47 +361,50 @@ async def get_manager(message: Message, state: FSMContext, bot: Bot):
     if message.text:
         await state.update_data(send_manager=message.text)
         await bot.send_message(chat_id=os.getenv('CHAT_ID_ADMIN'),
-                               text=f'Пользователь ник нейм: <b>@{message.from_user.username}</b>\n'
+                               text=f'CHAT ID: <b>"{message.from_user.id}"</b>\n'
+                                    f'Пользователь ник нейм: <b>@{message.from_user.username}</b>\n'
                                     f'Имя: <b>{message.from_user.first_name}</b>\n'
-                                    f'CHAT ID: <b>{message.from_user.id}</b>\n'
                                     f'Телефон: <b>+{user.phone}</b>\n'
                                     f'------------------------------\n'
                                     f'Сообщение:\n'
-                                    f'<i>{message.text}</i>\n')
+                                    f'<i>{message.text}</i>\n',
+                               reply_markup=await kb_ad.send_to_user())
+
         await state.clear()
         await message.answer('Спасибо за сообщение. В скором времени с вами свяжется менеджер',
                              reply_markup=await kb.main())
 
-    elif message.voice:
-        await state.update_data(send_manager=message.voice)
-        await bot.send_voice(chat_id=os.getenv('CHAT_ID_ADMIN'),
-                             caption=f'Пользователь ник нейм: <b>@{message.from_user.username}</b>\n'
-                                     f'Имя: <b>{message.from_user.first_name}</b>\n'
-                                     f'CHAT ID: <b>{message.from_user.id}</b>\n'
-                                     f'Телефон: <b>+{user.phone}</b>\n',
-                             voice=message.voice.file_id)
-        await state.clear()
-        await message.answer('Спасибо за голосовое сообщение. В скором времени с вами свяжется менеджер',
-                             reply_markup=await kb.main())
+    # elif message.voice:
+    #     await state.update_data(send_manager=message.voice)
+    #     await bot.send_voice(chat_id=os.getenv('CHAT_ID_ADMIN'),
+    #                          caption=f'CHAT ID: <b>"{message.from_user.id}"</b>\n'
+    #                                  f'Пользователь ник нейм: <b>@{message.from_user.username}</b>\n'
+    #                                  f'Имя: <b>{message.from_user.first_name}</b>\n'
+    #                                  f'Телефон: <b>+{user.phone}</b>\n',
+    #                          voice=message.voice.file_id,
+    #                          reply_markup=await kb_ad.send_to_user())
+    #     await state.clear()
+    #     await message.answer('Спасибо за голосовое сообщение. В скором времени с вами свяжется менеджер',
+    #                          reply_markup=await kb.main())
     else:
-        await message.answer('Отправь текстовое или голосовое сообщение')
+        await message.answer('Отправь текстовое сообщение')
 
 
 # ----------------Команды для Таксистов---------------
 # ----------------Выйти на линию ---------------------
-@router.callback_query(F.data.startswith('driverstart_'))
-async def driver_start(callback: CallbackQuery):
-    await callback.answer('')
-    await active_driver(callback.message.chat.id, is_start=True)
-    await callback.message.edit_text('Вы вышли на линию')
-
-
-# ----------------Уйти с линии на линию ---------------------
-@router.callback_query(F.data.startswith('driverfinish_'))
-async def driver_finish(callback: CallbackQuery):
-    await callback.answer('')
-    await active_driver(callback.message.chat.id, is_start=False)
-    await callback.message.edit_text('Вы ушли с линии')
+# @router.callback_query(F.data.startswith('driverstart_'))
+# async def driver_start(callback: CallbackQuery):
+#     await callback.answer('')
+#     await active_driver(callback.message.chat.id, is_start=True)
+#     await callback.message.edit_text('Вы вышли на линию')
+#
+#
+# # ----------------Уйти с линии на линию ---------------------
+# @router.callback_query(F.data.startswith('driverfinish_'))
+# async def driver_finish(callback: CallbackQuery):
+#     await callback.answer('')
+#     await active_driver(callback.message.chat.id, is_start=False)
+#     await callback.message.edit_text('Вы ушли с линии')
 
 
 # подать заявку в такси
@@ -478,6 +506,7 @@ class AddShop(StatesGroup):
 async def add_shop(message: Message, state: FSMContext):
     await state.set_state(AddShop.shop_name)
     await message.answer('Напишите название магазина', reply_markup=await kb.cancel_order())
+
 
 @router.message(AddShop.shop_name, F.text)
 async def add_shop(message: Message, state: FSMContext):

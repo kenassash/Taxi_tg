@@ -75,7 +75,7 @@ class Driver(Base):
     number_car: Mapped[int] = mapped_column(nullable=True)
     photo_car: Mapped[str] = mapped_column(String(150), nullable=True)
 
-    active: Mapped[bool] = mapped_column(Boolean, default=False)
+    active: Mapped[bool] = mapped_column(Boolean, default=True)
 
     orders_reply: Mapped[List['Order']] = relationship(back_populates='drivers_reply',
                                                        secondary='order_executions')

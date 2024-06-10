@@ -28,9 +28,8 @@ async def close(callback: CallbackQuery, bot: Bot):
         await bot.delete_message(chat_id=order_id.user_rel.tg_id, message_id=message_id)
         message_id_pass = await bot.send_message(chat_id=order_id.user_rel.tg_id,
                                                  text=f'Ожидайте ⌛\n'
-                                                      f'Будет назначен новый водитель в ближайшее время\n',
-                                                 reply_markup=await kb.delete_order(order_id.id))
-        await bot.send_message(chat_id=os.getenv('CHAT_GROUP_ID'),
+                                                      f'Будет назначен новый водитель в ближайшее время\n')
+        message_driver = await bot.send_message(chat_id=os.getenv('CHAT_GROUP_ID'),
                                text=f'Водитель {driver_id.name} отменил выпонлнение заказа\n'
                                     f"Телефон <b>+{order_id.user_rel.phone}</b>\n\n"
                                     f"Начальная точка: <b>{order_id.point_start}</b>\n\n"
@@ -41,6 +40,11 @@ async def close(callback: CallbackQuery, bot: Bot):
                                reply_markup=await kb.accept(order_id.id, message_id_pass.message_id))
 
         await callback.message.edit_text(f'Вы отказались от заказа <b>№{order_id.id}</b>')
+
+        await bot.edit_message_reply_markup(
+            chat_id=order_id.user_rel.tg_id,
+            message_id=message_id_pass.message_id,
+            reply_markup=await kb.delete_order(order_id.id, message_driver.message_id))
 
 
     except AttributeError:
@@ -67,11 +71,10 @@ async def timewait(callback: CallbackQuery, bot: Bot):
                                                     f'Автомобиль:<b> {driver.car_name}</b>\n\n'
                                                     f'Номер: <b>{driver.number_car}</b>\n\n'
                                                     f'Цена поездки: <b>{order_id.price}Р</b>\n\n'
-                                                    f'Будет у вас через <b>{time_wait} мин.</b>',
-                                            reply_markup=await kb.delete_order(order_id.id))
+                                                    f'Будет у вас через <b>{time_wait} мин.</b>')
 
 
-        await callback.message.edit_text(f"Заказ <b>{order_id.id}</b>\n\n"
+        message_driver = await callback.message.edit_text(f"Заказ <b>{order_id.id}</b>\n\n"
                                          f"Телефон <b>+{order_id.user_rel.phone}</b>\n\n"
                                          f"Начальная точка: <b>{order_id.point_start}</b>\n\n"
                                          f"Конечная точка: <b>{order_id.point_end}</b>\n\n"
@@ -80,6 +83,10 @@ async def timewait(callback: CallbackQuery, bot: Bot):
                                          f"Цена: <b>{order_id.price}Р</b>\n\n",
                                          reply_markup=await kb.on_the_spot_kb(order_id.id, message_pass.message_id))
         # reply_markup = await kb.close_and_finish(order_id.id)
+        await bot.edit_message_reply_markup(
+            chat_id=order_id.user_rel.tg_id,
+            message_id=message_pass.message_id,
+            reply_markup=await kb.delete_order(order_id.id, message_driver.message_id))
     except AttributeError:
         await callback.answer('')
         await callback.message.answer('Пассажир отменил заказ')
@@ -101,9 +108,8 @@ async def on_the_spot(callback: CallbackQuery, bot: Bot):
                                                     f'Номер телефона:<b> +{driver.phone}</b>\n\n'
                                                     f'Автомобиль:<b> {driver.car_name}</b>\n\n'
                                                     f'Номер: <b>{driver.number_car}</b>\n\n'
-                                                    f'Цена поездки: <b>{order_id.price}Р</b>\n\n',
-                                            reply_markup=await kb.delete_order(order_id.id))
-        await callback.message.edit_text(f"Заказ <b>{order_id.id}</b>\n\n"
+                                                    f'Цена поездки: <b>{order_id.price}Р</b>\n\n')
+        message_driver = await callback.message.edit_text(f"Заказ <b>{order_id.id}</b>\n\n"
                                          f"Телефон <b>+{order_id.user_rel.phone}</b>\n\n"
                                          f"Начальная точка: <b>{order_id.point_start}</b>\n\n"
                                          f"Конечная точка: <b>{order_id.point_end}</b>\n\n"
@@ -111,6 +117,11 @@ async def on_the_spot(callback: CallbackQuery, bot: Bot):
                                          # f"Время пути: <b>{order_id.time_way}мин</b>\n\n"
                                          f"Цена: <b>{order_id.price}Р</b>\n\n",
                                          reply_markup=await kb.close_and_finish(order_id.id, message_pass.message_id))
+
+        await bot.edit_message_reply_markup(
+            chat_id=order_id.user_rel.tg_id,
+            message_id=message_pass.message_id,
+            reply_markup=await kb.delete_order(order_id.id, message_driver.message_id))
     except AttributeError:
         await callback.answer('')
         await callback.message.answer('Пассажир отменил заказ')
@@ -138,19 +149,4 @@ async def finish(callback: CallbackQuery, bot: Bot):
         await callback.message.answer('Пассажир отменил заказ')
 
 
-@driver_router.callback_query(F.data.startswith('deleteorder_'))
-async def delete_order_passager(callback: CallbackQuery, bot: Bot, state: FSMContext):
-    await callback.answer('')
-    await callback.message.answer('Заказ отменен')
-    order_id = callback.data.split('_')[1]
-    driver_id = await get_order_driver(order_id)
 
-    # Проверка, если список drivers_reply пуст
-    if not driver_id.drivers_reply:
-        await callback.message.answer('Нет водителей для данного заказа')
-    else:
-        driver = driver_id.drivers_reply[0]
-        await bot.send_message(chat_id=driver.tg_id, text='Пассажир отменил заказ')
-
-    await delete_order_pass(order_id)
-    await state.clear()

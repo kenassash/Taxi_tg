@@ -9,11 +9,20 @@ async def admin_keyboard():
     keyboard = InlineKeyboardBuilder()
     keyboard.add(InlineKeyboardButton(text='Автомобили', callback_data='car_menu'))
     keyboard.add(InlineKeyboardButton(text='Информация', callback_data='info'))
-    keyboard.add(InlineKeyboardButton(text='Рассылка пользователям', callback_data='newletter'))
+    keyboard.add(InlineKeyboardButton(text='Рассылка', callback_data='newletter'))
     keyboard.add(InlineKeyboardButton(text='Поменять цену', callback_data='change_settings'))
     keyboard.add(InlineKeyboardButton(text='Пользователи', callback_data='number_passeger'))
     keyboard.add(InlineKeyboardButton(text='Бан', callback_data='ban_user'))
+    keyboard.add(InlineKeyboardButton(text='Время сна', callback_data='time_restriction'))
     keyboard.add(InlineKeyboardButton(text='На линии', callback_data='online'))
+    return keyboard.adjust(2).as_markup()
+
+
+async def turn_time_rest():
+    keyboard = InlineKeyboardBuilder()
+    keyboard.add(InlineKeyboardButton(text='Включить', callback_data='turntimerest_YES'))
+    keyboard.add(InlineKeyboardButton(text='Отключить', callback_data='turntimerest_NO'))
+    keyboard.add(InlineKeyboardButton(text='Отменить', callback_data=f'cancelorder_'))
     return keyboard.adjust(2).as_markup()
 
 
@@ -90,3 +99,9 @@ async def ban_users_phone():
     keyboard.add(InlineKeyboardButton(text='Список', callback_data=f'ban_list'))
     keyboard.add(InlineKeyboardButton(text='Отменить', callback_data=f'cancelorder_'))
     return keyboard.adjust(2).as_markup()
+
+
+async def send_to_user():
+    keyboard = InlineKeyboardBuilder()
+    keyboard.add(InlineKeyboardButton(text='Ответить', callback_data=f'sendTouser'))
+    return keyboard.adjust().as_markup()
