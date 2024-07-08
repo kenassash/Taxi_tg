@@ -68,8 +68,9 @@ async def change_money():
     keyboard = InlineKeyboardBuilder()
     keyboard.add(InlineKeyboardButton(text=f'Местно', callback_data=f'changeinside'))
     keyboard.add(InlineKeyboardButton(text='Другой нп', callback_data=f'changeoutside'))
+    keyboard.add(InlineKeyboardButton(text='Связку между', callback_data=f'change_point_start_end'))
     keyboard.add(InlineKeyboardButton(text='Отменить', callback_data=f'cancelorder_'))
-    return keyboard.adjust(2).as_markup()
+    return keyboard.adjust(3).as_markup()
 
 
 async def change_mouney_inside():

@@ -48,6 +48,20 @@ async def set_order(user_id, data):
         await session.refresh(order)  # Обновляем объект, чтобы получить актуальный id
         return order.id
 
+async def shop_order_add(user_id, price):
+    async with async_session() as session:
+        order = Order(user=user_id, price=price)
+        session.add(order)
+        await session.commit()  # Сохраняем изменения в базу данных
+        await session.refresh(order)  # Обновляем объект, чтобы получить актуальный id
+        return order.id
+
+async def save_free_ride(tg_id, free_ride):
+    async with async_session() as session:
+        await session.execute(update(User)
+                              .where(User.tg_id == tg_id)
+                              .values(free_ride=free_ride))
+        await session.commit()
 
 async def get_all_orders(id):
     async with async_session() as session:
@@ -385,15 +399,15 @@ async def shop_add(user_id, shop_name, shop_activate=True):
 #     "Ясная Поляна": 1600
 # }
 
-cities = {
-    "Екатеринославка": 150,
-    "Таёжный": 200,
-    "Полигон": 350,
-    "Восточный за ж/д": 200,
-    "Агрохолдинг": 300,
-}
-async def test_driver():
-    async with async_session() as session:
-        for city, price in cities.items():
-            session.add(CityInside(city_name=city, price=price))
-        await session.commit()
+# cities = {
+#     "Екатеринославка": 150,
+#     "Таёжный": 200,
+#     "Полигон": 350,
+#     "Восточный за ж/д": 200,
+#     "Агрохолдинг": 300,
+# }
+# async def test_driver():
+#     async with async_session() as session:
+#         for city, price in cities.items():
+#             session.add(CityInside(city_name=city, price=price))
+#         await session.commit()

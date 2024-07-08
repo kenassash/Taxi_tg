@@ -84,7 +84,7 @@ async def time_wait(order_id, messege_id):
     keyboard.add(InlineKeyboardButton(text='8 мин.', callback_data=f'timewait_{order_id}_8_{messege_id}'))
     keyboard.add(InlineKeyboardButton(text='10 мин.', callback_data=f'timewait_{order_id}_10_{messege_id}'))
     keyboard.add(InlineKeyboardButton(text='15 мин.', callback_data=f'timewait_{order_id}_15_{messege_id}'))
-    keyboard.add(InlineKeyboardButton(text='30 мин.', callback_data=f'timewait_{order_id}_30_{messege_id}'))
+    keyboard.add(InlineKeyboardButton(text='20 мин.', callback_data=f'timewait_{order_id}_20_{messege_id}'))
     keyboard.add(InlineKeyboardButton(text='На месте 🎯', callback_data=f'onthespot_{order_id}_{messege_id}'))
     keyboard.add(InlineKeyboardButton(text='Отказаться 🤦‍♂️', callback_data=f'close_{order_id}_{messege_id}'))
     # keyboard.add(InlineKeyboardButton(text='Отменить заказ ❌', callback_data=f'deleteorder_{order_id}_{messege_id}'))

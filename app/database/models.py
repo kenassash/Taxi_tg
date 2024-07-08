@@ -33,9 +33,10 @@ class User(Base):
     phone: Mapped[int] = mapped_column(nullable=True)
 
     banned: Mapped[bool] = mapped_column(Boolean, default=False)
-
     shop_activate: Mapped[bool] = mapped_column(Boolean, default=False)
     shop_name: Mapped[str] = mapped_column(String(255), nullable=True)
+    free_ride: Mapped[int] = mapped_column(default=1)
+
 
     order_rel: Mapped[List['Order']] = relationship(back_populates='user_rel')
 

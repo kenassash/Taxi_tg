@@ -22,7 +22,6 @@ from app.calculate import length_way
 from middleware.ban_middleware import CheckUserBannedMiddleware
 from middleware.shop_middleware import ShopMiddleware
 
-
 router = Router()
 router.message.filter(ChatTypeFilter(['private']))
 
@@ -100,7 +99,8 @@ async def cmd_start(message: Message, state: FSMContext):
 
     if user:
         # Если пользователь уже есть в базе данных, приветствуем его
-        await message.answer(f'<b>Добро пожаловать, {message.from_user.full_name}!</b> 😊',
+        await message.answer(f'<b>Добро пожаловать, {message.from_user.full_name}!</b> 😊\n\n'
+                             f'До бесплатной поездки осталось <b>{Settings.free_ride - user.free_ride}</b>',
                              reply_markup=await kb.main())
     else:
         # Если пользователь не найден в базе данных, запрашиваем номер телефона
@@ -119,10 +119,12 @@ async def process_phone(message: Message, state: FSMContext):
 
     # Запись пользователя в базу данных
     await set_user(tg_id, phone_number)
+    user = await get_user(tg_id)
 
     # Приветствие пользователя после успешной записи
     await message.answer(f'Вы зарегестрировались', reply_markup=ReplyKeyboardRemove())
-    await message.answer(f'<b>Добро пожаловать, {message.from_user.full_name}!</b> 😊',
+    await message.answer(f'<b>Добро пожаловать, {message.from_user.full_name}!</b> 😊\n\n'
+                         f'До бесплатной поездки осталось <b>{Settings.free_ride - user.free_ride}</b>',
                          reply_markup=await kb.main())
     await state.clear()
 
@@ -218,8 +220,28 @@ async def address2(message: Message, state: FSMContext):
 
     price1 = data['price1']
     price2 = data['price2']
-    price_max = max(int(price1), int(price2))
-    price = int(price_max) + Settings.fix_price
+    price = max(int(price1), int(price2))
+    # -----------------------------no coment-----------
+    if (data['city1'] == 'Западянка+Куйбышевская' and data['city2'] == 'Центр') \
+            or (data['city1'] == 'Центр' and data['city2'] == 'Западянка+Куйбышевская'):
+        price += Settings.fix_price
+    elif (data['city1'] == 'Восточный' and data['city2'] == 'Восточный за ж/д') \
+            or (data['city1'] == 'Восточный за ж/д' and data['city2'] == 'Восточный'):
+        price -= Settings.fix_price
+    elif (data['city1'] == 'Восточный за ж/д' and data['city2'] == 'Таёжный') \
+            or (data['city1'] == 'Таёжный' and data['city2'] == 'Восточный за ж/д'):
+        price += Settings.fix_price
+    elif (data['city1'] == 'Восточный' and data['city2'] == 'Таёжный') \
+            or (data['city1'] == 'Таёжный' and data['city2'] == 'Восточный'):
+        price += Settings.fix_price
+    elif (data['city1'] == 'Западянка+Куйбышевская' and data['city2'] == 'Восточный') \
+            or (data['city1'] == 'Восточный' and data['city2'] == 'Западянка+Куйбышевская'):
+        price += Settings.fix_price
+
+    # -----------------------------no coment-----------
+    user_id = await get_user(message.from_user.id)
+    if user_id.free_ride == 0:
+        price = 0
     await message.answer(f"🅰️: Начальная точка: <b>{point_start}</b>\n\n"
                          f"🅱️: Конечная точка: <b>{point_end}</b>\n\n"
                          f"<b>Цена:</b> {price}₽",
@@ -241,8 +263,28 @@ async def finish_price(callback: CallbackQuery, state: FSMContext, bot: Bot):
 
     price1 = data['price1']
     price2 = data['price2']
-    price_max = max(price1, price2)
-    price = int(price_max) + Settings.fix_price
+    price = max(int(price1), int(price2))
+    # -----------------------------no coment-----------
+    if (data['city1'] == 'Западянка+Куйбышевская' and data['city2'] == 'Центр') \
+            or (data['city1'] == 'Центр' and data['city2'] == 'Западянка+Куйбышевская'):
+        price += Settings.fix_price
+    elif (data['city1'] == 'Восточный' and data['city2'] == 'Восточный за ж/д') \
+            or (data['city1'] == 'Восточный за ж/д' and data['city2'] == 'Восточный'):
+        price -= Settings.fix_price
+    elif (data['city1'] == 'Восточный за ж/д' and data['city2'] == 'Таёжный') \
+            or (data['city1'] == 'Таёжный' and data['city2'] == 'Восточный за ж/д'):
+        price += Settings.fix_price
+    elif (data['city1'] == 'Восточный' and data['city2'] == 'Таёжный') \
+            or (data['city1'] == 'Таёжный' and data['city2'] == 'Восточный'):
+        price += Settings.fix_price
+    elif (data['city1'] == 'Западянка+Куйбышевская' and data['city2'] == 'Восточный') \
+            or (data['city1'] == 'Восточный' and data['city2'] == 'Западянка+Куйбышевская'):
+        price += Settings.fix_price
+
+    user_id = await get_user(callback.from_user.id)
+    if user_id.free_ride == 0:
+        price = 0
+    # -----------------------------no coment-----------
 
     await state.clear()
     await state.update_data(point_start=point_start, point_end=point_end, price=price)

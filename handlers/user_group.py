@@ -56,22 +56,11 @@ async def accept(callback: CallbackQuery, bot: Bot, state: FSMContext):
         #     return
 
 
-
-
-
-        # сообщение id предыдущее (ожидание чтоб удалить)
-
         # Создаем запись о начале выполнения заказа
         await start_order_execution(order_id.id, driver.id)
         # удаляю сообщение у пользователя
         await bot.delete_message(chat_id=order_id.user_rel.tg_id, message_id=message_id_pass)
 
-        # await bot.send_photo(chat_id=order_id.user_rel.tg_id, photo=driver.photo_car, caption=f'За вами приедет такси <b>{driver.car_name} {driver.number_car}</b>\n')
-        # await bot.send_message(chat_id=callback.from_user.id,
-        #                        text=callback.message.text,
-        #                        reply_markup=await kb.close_and_finish(order_id.id))
-        # await bot.send_message(chat_id=callback.from_user.id,
-        #                        text=callback.message.text)
         message_pass = await bot.send_photo(chat_id=order_id.user_rel.tg_id,
                                             photo=driver.photo_car,
                                             caption=f'Водитель принял ваше предложение 🤝\n\n'
@@ -79,18 +68,6 @@ async def accept(callback: CallbackQuery, bot: Bot, state: FSMContext):
                                                     f'Автомобиль:<b> {driver.car_name}</b>\n\n'
                                                     f'Номер: <b>{driver.number_car}</b>\n\n'
                                                     f'Цена поездки: <b>{order_id.price}Р</b>\n\n')
-        # message_pass = await bot.edit_message_media(chat_id=order_id.user_rel.tg_id,
-        #                                             message_id=message_id_pass,
-        #                                             media=InputMediaPhoto
-        #                                             (
-        #                                                 media=driver.photo_car,
-        #                                                 caption=f'Водитель принял ваше предложение 🤝\n\n'
-        #                                             f'Номер телефона:<b> +{driver.phone}</b>\n\n'
-        #                                             f'Автомобиль:<b> {driver.car_name}</b>\n\n'
-        #                                             f'Номер: <b>{driver.number_car}</b>\n\n'
-        #                                             f'Цена поездки: <b>{order_id.price}Р</b>\n\n'
-        #                                             f'Водитель подъедет в скором времени',),
-        #                                             reply_markup=await kb.delete_order(order_id.id))
 
         # Обновляем состояние, сохраняя идентификатор отправленного сообщения
 

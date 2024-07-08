@@ -326,6 +326,7 @@ async def newsletter_message(message: Message, state: FSMContext):
 
 class ChangeMoney(StatesGroup):
     price = State()
+    change_price = State()
 
 
 @admin.callback_query(IsAdmin(), F.data == 'change_settings')
@@ -335,8 +336,9 @@ async def change_settings_callback1(callback: CallbackQuery, state: FSMContext):
                                      reply_markup=await kb_admin.change_money())
 
 
-@admin.callback_query(IsAdmin(), or_f(F.data == 'changeinside', F.data == 'changeoutside'))
-async def change_settings_callback2(callback: CallbackQuery):
+@admin.callback_query(IsAdmin(), or_f(F.data == 'changeinside', F.data == 'changeoutside', \
+                                      F.data == 'change_point_start_end'))
+async def change_settings_callback2(callback: CallbackQuery, state: FSMContext):
     await callback.answer('')
     if callback.data == 'changeinside':
         await callback.message.answer('Выберите где нужно поменять тариф 💵',
@@ -344,6 +346,21 @@ async def change_settings_callback2(callback: CallbackQuery):
     elif callback.data == 'changeoutside':
         await callback.message.answer('Выберите где нужно поменять тариф 💵',
                                       reply_markup=await kb_admin.change_mouney_outside())
+    elif callback.data == 'change_point_start_end':
+        await callback.message.answer(f'Введите сумму на которую поменять, сейчас стоит {Settings.fix_price}')
+        await state.set_state(ChangeMoney.change_price)
+
+@admin.message(IsAdmin(), ChangeMoney.change_price, F.text)
+async def change_settings_value(message: Message, state: FSMContext):
+    input_int = message.text.strip()
+    pattern = r"^\d+$"
+    if re.match(pattern, input_int):
+        await state.update_data(setting=message.text)
+        Settings.set_fix_price(int(message.text))
+        await message.answer(f'Цена успешна добавлена {Settings.fix_price}')
+        await state.clear()
+    else:
+        await message.answer("Пожалуйста, введите только цифры.")
 
 
 @admin.callback_query(IsAdmin(), or_f(F.data.startswith('chin_'), F.data.startswith('chout_')))
@@ -454,15 +471,23 @@ async def info_car_driver(callback: CallbackQuery):
         total_earnings = sum(order.price for order in driver_info.orders_reply)
         # data_created = [data.created for data in driver_info.orders_reply]
         # print(data_created)
+        # Подсчитываем количество заказов с нулевой стоимостью
+        zero_price_orders_count = sum(1 for order in driver_info.orders_reply if order.price == 0)
+
 
         # Формируем текст сообщения с информацией о водителе
         message_text = (
             f"Информация о водителе:\n"
-            f"Имя: <b>{driver_info.car_name} - {driver_info.number_car}</b>\n"
+            f"Имя: <b>{driver_info.name}</b>\n"
+            f"Автомобиль: <b>{driver_info.car_name} - {driver_info.number_car}</b>\n"
             f"Всего заказов: <b>{total_orders}</b>\n"
             f"Общий заработок: <b>{total_earnings} руб.</b>\n"
             f"-------------------------------\n"
         )
+        # Добавляем информацию о заказах с нулевой стоимостью, если такие есть
+        if zero_price_orders_count > 0:
+            message_text += f"<b>Заказов с нулевой стоимостью: {zero_price_orders_count}</b>\n"
+
         # Создаем словарь для хранения количества заказов по датам
         orders_by_date = {}
         for order in driver_info.orders_reply:
