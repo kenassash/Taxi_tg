@@ -12,10 +12,14 @@ from aiogram import Bot
 import app.keyboards as kb
 from app.database.requests import get_all_orders, get_driver, start_order_execution, delete_order_execution
 
+from middleware.driver_active_middleware import DriverActiveMiddleware
+
 user_group_router = Router()
 user_group_router.message.filter(ChatTypeFilter(['group', 'supergroup']))
 load_dotenv()
 
+# user_group_router.message.middleware(DriverActiveMiddleware())
+user_group_router.callback_query.middleware(DriverActiveMiddleware())
 
 # restricted_words = {'кабан', 'хомяк', 'выпухоль'}
 
@@ -40,7 +44,7 @@ load_dotenv()
 # @user_group_router.message(CommandStart())
 # async def cmd_start(message: Message):
 #     await test_driver()
-
+#
 
 @user_group_router.callback_query(F.data.startswith('accept_'))
 async def accept(callback: CallbackQuery, bot: Bot, state: FSMContext):

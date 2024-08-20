@@ -2,7 +2,8 @@ from aiogram.types import (ReplyKeyboardMarkup, KeyboardButton,
                            InlineKeyboardMarkup, InlineKeyboardButton)
 from aiogram.utils.keyboard import InlineKeyboardBuilder, ReplyKeyboardBuilder
 
-from app.database.requests import get_all_car, get_cities_inside, get_cities_outside
+from app.database.requests import get_all_car, get_cities_inside, get_cities_outside, \
+    get_cities_routes1, get_cities_routes2
 
 
 async def admin_keyboard():
@@ -15,6 +16,7 @@ async def admin_keyboard():
     keyboard.add(InlineKeyboardButton(text='Бан', callback_data='ban_user'))
     keyboard.add(InlineKeyboardButton(text='Время сна', callback_data='time_restriction'))
     keyboard.add(InlineKeyboardButton(text='На линии', callback_data='online'))
+    keyboard.add(InlineKeyboardButton(text='Запрет водителю', callback_data='driver_block'))
     return keyboard.adjust(2).as_markup()
 
 
@@ -28,7 +30,7 @@ async def turn_time_rest():
 
 async def car_menu_keyboard():
     keyboard = InlineKeyboardBuilder()
-    keyboard.add(InlineKeyboardButton(text='Добавить', callback_data='add_car'))
+    # keyboard.add(InlineKeyboardButton(text='Добавить', callback_data='add_car'))
     keyboard.add(InlineKeyboardButton(text='Изменить', callback_data='edit_car'))
     keyboard.add(InlineKeyboardButton(text='Удалить', callback_data='delete_car'))
     return keyboard.adjust(3).as_markup()
@@ -92,6 +94,24 @@ async def change_mouney_outside():
     keyboard.add(InlineKeyboardButton(text='Отменить', callback_data=f'cancelorder_'))
     return keyboard.adjust(2).as_markup()
 
+async def change_mouney_routes1():
+    keyboard = InlineKeyboardBuilder()
+    cities = await get_cities_routes1()
+    for city in cities:
+        keyboard.add(InlineKeyboardButton(text=city.city1,
+                                          callback_data=f'chroute_{city.city1}'))
+    keyboard.add(InlineKeyboardButton(text='Отменить', callback_data=f'cancelorder_'))
+    return keyboard.adjust(2).as_markup()
+
+async def change_mouney_routes2(city1: str):
+    keyboard = InlineKeyboardBuilder()
+    cities = await get_cities_routes2(city1)
+    for city in cities:
+        keyboard.add(InlineKeyboardButton(text=city,
+                                          callback_data=f'finroute_{city}'))
+    keyboard.add(InlineKeyboardButton(text='Отменить', callback_data=f'cancelorder_'))
+    return keyboard.adjust(2).as_markup()
+
 
 async def ban_users_phone():
     keyboard = InlineKeyboardBuilder()
@@ -106,3 +126,20 @@ async def send_to_user():
     keyboard = InlineKeyboardBuilder()
     keyboard.add(InlineKeyboardButton(text='Ответить', callback_data=f'sendTouser'))
     return keyboard.adjust().as_markup()
+
+async def button_deactive():
+    keyboard = InlineKeyboardBuilder()
+    keyboard.add(InlineKeyboardButton(text='Заблокировать', callback_data=f'blockdrive_YES'))
+    keyboard.add(InlineKeyboardButton(text='Разблокировать', callback_data=f'blockdrive_NO'))
+    keyboard.add(InlineKeyboardButton(text='Отменить', callback_data=f'cancelorder_'))
+    return keyboard.adjust(2).as_markup()
+
+
+async def driver_no_active():
+    drivers = await get_all_car()
+    keyboard = InlineKeyboardBuilder()
+    for driver in drivers:
+        keyboard.add(InlineKeyboardButton(text=f'{driver.name} - {driver.number_car}',
+                                          callback_data=f'noactive_{driver.id}'))
+    keyboard.add(InlineKeyboardButton(text='Отменить', callback_data=f'cancelorder_'))
+    return keyboard.adjust(2).as_markup()

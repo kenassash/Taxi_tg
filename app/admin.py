@@ -1,7 +1,6 @@
 import json
 import os
 import re
-from datetime import timedelta, time
 
 from aiogram import Router, F, Bot
 from aiogram.types import Message, CallbackQuery, ReplyKeyboardRemove
@@ -12,7 +11,8 @@ from aiogram.fsm.state import State, StatesGroup
 from app.change_price import Settings
 from app.database.requests import add_car, get_all_car, remove_car, print_all_online_executions, \
     get_all_drivers_with_update_date, get_users, get_one_car, get_driver_info, reset_to_zero, update_car, \
-    get_users_count, add_change_price, ban_user, get_ban_all_user
+    get_users_count, add_change_price, ban_user, get_ban_all_user, get_cities_routes_price, \
+    get_cities_routes_price_update, no_active
 
 import app.keyboards as kb
 import app.kb.kb_admin as kb_admin
@@ -48,6 +48,38 @@ async def admin_features(message: Message):
     await message.answer("Что хотите сделать?", reply_markup=await kb_admin.admin_keyboard())
 
 
+#------------------запрет водителю/активация---------
+
+@admin.callback_query(IsAdmin(), F.data == 'driver_block')
+async def block_driver(callback: CallbackQuery):
+    await callback.answer('')
+    await callback.message.answer('Выберите',
+                                  reply_markup=await kb_admin.button_deactive())
+
+@admin.callback_query(IsAdmin(), F.data.startswith('blockdrive_'))
+async def driver_no_active(callback: CallbackQuery, state: FSMContext):
+    await callback.answer('')
+    status = callback.data.split('_')[1]
+    await state.update_data(block_driver=status)
+    await callback.message.edit_text('Выберите водителя',
+                                  reply_markup=await kb_admin.driver_no_active())
+
+
+@admin.callback_query(IsAdmin(), F.data.startswith('noactive_'))
+async def no_active_driver(callback: CallbackQuery, state: FSMContext):
+    await callback.answer('')
+    data = await state.get_data()
+    driver_id = callback.data.split('_')[1]
+    if data['block_driver'] == 'YES':
+        await no_active(driver_id, is_start=False)
+        await callback.message.edit_text(f'Водитель заблокирован')
+    elif data['block_driver'] == 'NO':
+        await no_active(driver_id, is_start=True)
+        await callback.message.edit_text(f'Водитель разблокирован')
+    await state.clear()
+
+
+
 # -----------------Время сна---------------
 
 @admin.callback_query(IsAdmin(), F.data == 'time_restriction')
@@ -79,86 +111,86 @@ async def car_menu(callback: CallbackQuery, state: FSMContext):
 
 # ------------------Добавить машину /add_car-----------------------
 
-@admin.callback_query(IsAdmin(), F.data == 'add_car')
-async def add_phone1(callback: CallbackQuery, state: FSMContext):
-    await state.set_state(AddDriver.phone)
-    await callback.answer('')
-    await callback.message.answer('Отправь номер телефона через 7', reply_markup=await kb.cancel_order())
-
-
-@admin.message(IsAdmin(), AddDriver.phone, F.text)
-async def add_name(message: Message, state: FSMContext):
-    await state.update_data(phone=message.text)
-    await state.set_state(AddDriver.name)
-    await message.answer('Как зовут водителя', reply_markup=await kb.cancel_order())
-
-
-@admin.message(AddDriver.phone)
-async def add_phone2(message: Message, state: FSMContext):
-    await message.answer('Отправь телефон через кнопку')
-
-
-@admin.message(IsAdmin(), AddDriver.name, F.text)
-async def add_car_name(message: Message, state: FSMContext):
-    await state.update_data(name=message.text)
-    await state.set_state(AddDriver.car_name)
-    await message.answer('Введите название марки машины', reply_markup=await kb.cancel_order())
-
-
-@admin.message(AddDriver.name)
-async def add_name2(message: Message, state: FSMContext):
-    await message.answer('Отправь имя водителя')
-
-
-@admin.message(IsAdmin(), AddDriver.car_name, F.text)
-async def add_number_car(message: Message, state: FSMContext):
-    await state.update_data(car_name=message.text)
-    await state.set_state(AddDriver.number_car)
-    await message.answer('Введите гос номер машины', reply_markup=await kb.cancel_order())
-
-
-@admin.message(AddDriver.car_name)
-async def add_car_name(message: Message, state: FSMContext):
-    await message.answer('Введите коррекно название машины')
-
-
-@admin.message(IsAdmin(), AddDriver.number_car, F.text)
-async def add_item_category(message: Message, state: FSMContext):
-    await state.update_data(number_car=message.text)
-    await state.set_state(AddDriver.tg_id)
-    await message.answer('Отправь CHAT-ID пользователя', reply_markup=await kb.cancel_order())
-
-
-@admin.message(AddDriver.number_car)
-async def add_number_car(message: Message, state: FSMContext):
-    await message.answer('Отправь коррекно гос номер')
-
-
-@admin.message(IsAdmin(), AddDriver.tg_id, F.text)
-async def add_tg_id(message: Message, state: FSMContext):
-    await state.update_data(tg_id=message.text)
-    await state.set_state(AddDriver.photo_car)
-    await message.answer('Отправь фото машины', reply_markup=await kb.cancel_order())
-
-
-@admin.message(AddDriver.tg_id)
-async def add_tg_id(message: Message, state: FSMContext):
-    await message.answer('Отправь корректно chat-id')
-
-
-@admin.message(IsAdmin(), AddDriver.photo_car, F.photo)
-async def add_item_category(message: Message, state: FSMContext):
-    await state.update_data(photo_car=message.photo[-1].file_id)
-    data = await state.get_data()
-    await message.answer_photo(photo=data['photo_car'], caption=f"Телефон {data['phone']}")
-    await add_car(data)
-    await message.answer('Машина успешна добавлена')
-    await state.clear()
-
-
-@admin.message(AddDriver.photo_car)
-async def phone(message: Message, state: FSMContext):
-    await message.answer('Отправь фото корректно')
+# @admin.callback_query(IsAdmin(), F.data == 'add_car')
+# async def add_phone1(callback: CallbackQuery, state: FSMContext):
+#     await state.set_state(AddDriver.phone)
+#     await callback.answer('')
+#     await callback.message.answer('Отправь номер телефона через 7', reply_markup=await kb.cancel_order())
+#
+#
+# @admin.message(IsAdmin(), AddDriver.phone, F.text)
+# async def add_name(message: Message, state: FSMContext):
+#     await state.update_data(phone=message.text)
+#     await state.set_state(AddDriver.name)
+#     await message.answer('Как зовут водителя', reply_markup=await kb.cancel_order())
+#
+#
+# @admin.message(AddDriver.phone)
+# async def add_phone2(message: Message, state: FSMContext):
+#     await message.answer('Отправь телефон через кнопку')
+#
+#
+# @admin.message(IsAdmin(), AddDriver.name, F.text)
+# async def add_car_name(message: Message, state: FSMContext):
+#     await state.update_data(name=message.text)
+#     await state.set_state(AddDriver.car_name)
+#     await message.answer('Введите название марки машины', reply_markup=await kb.cancel_order())
+#
+#
+# @admin.message(AddDriver.name)
+# async def add_name2(message: Message, state: FSMContext):
+#     await message.answer('Отправь имя водителя')
+#
+#
+# @admin.message(IsAdmin(), AddDriver.car_name, F.text)
+# async def add_number_car(message: Message, state: FSMContext):
+#     await state.update_data(car_name=message.text)
+#     await state.set_state(AddDriver.number_car)
+#     await message.answer('Введите гос номер машины', reply_markup=await kb.cancel_order())
+#
+#
+# @admin.message(AddDriver.car_name)
+# async def add_car_name(message: Message, state: FSMContext):
+#     await message.answer('Введите коррекно название машины')
+#
+#
+# @admin.message(IsAdmin(), AddDriver.number_car, F.text)
+# async def add_item_category(message: Message, state: FSMContext):
+#     await state.update_data(number_car=message.text)
+#     await state.set_state(AddDriver.tg_id)
+#     await message.answer('Отправь CHAT-ID пользователя', reply_markup=await kb.cancel_order())
+#
+#
+# @admin.message(AddDriver.number_car)
+# async def add_number_car(message: Message, state: FSMContext):
+#     await message.answer('Отправь коррекно гос номер')
+#
+#
+# @admin.message(IsAdmin(), AddDriver.tg_id, F.text)
+# async def add_tg_id(message: Message, state: FSMContext):
+#     await state.update_data(tg_id=message.text)
+#     await state.set_state(AddDriver.photo_car)
+#     await message.answer('Отправь фото машины', reply_markup=await kb.cancel_order())
+#
+#
+# @admin.message(AddDriver.tg_id)
+# async def add_tg_id(message: Message, state: FSMContext):
+#     await message.answer('Отправь корректно chat-id')
+#
+#
+# @admin.message(IsAdmin(), AddDriver.photo_car, F.photo)
+# async def add_item_category(message: Message, state: FSMContext):
+#     await state.update_data(photo_car=message.photo[-1].file_id)
+#     data = await state.get_data()
+#     await message.answer_photo(photo=data['photo_car'], caption=f"Телефон {data['phone']}")
+#     await add_car(data)
+#     await message.answer('Машина успешна добавлена')
+#     await state.clear()
+#
+#
+# @admin.message(AddDriver.photo_car)
+# async def phone(message: Message, state: FSMContext):
+#     await message.answer('Отправь фото корректно')
 
 
 # ------------------Удалить машину /delete_car-----------------------
@@ -277,11 +309,11 @@ async def admin_features(callback: CallbackQuery):
 
     for driver in active_drivers:
         await callback.message.answer(f'Активные водители:\n'
-                                      f'Машина {driver.car_name} - {driver.number_car} Дата обновления {driver.updated + timedelta(hours=9)}')
+                                      f'Машина {driver.car_name} - {driver.number_car} Дата обновления {driver.updated}')
 
     for driver in inactive_drivers:
         await callback.message.answer(f'Неактивные водители:\n'
-                                      f'Машина {driver.car_name} - {driver.number_car} Дата обновления {driver.updated + timedelta(hours=9)}')
+                                      f'Машина {driver.car_name} - {driver.number_car} Дата обновления {driver.updated}')
 
     # online_executions = await print_all_online_executions()
     # for online_execution in online_executions:
@@ -347,20 +379,57 @@ async def change_settings_callback2(callback: CallbackQuery, state: FSMContext):
         await callback.message.answer('Выберите где нужно поменять тариф 💵',
                                       reply_markup=await kb_admin.change_mouney_outside())
     elif callback.data == 'change_point_start_end':
-        await callback.message.answer(f'Введите сумму на которую поменять, сейчас стоит {Settings.fix_price}')
-        await state.set_state(ChangeMoney.change_price)
+        # await callback.message.answer(f'Введите сумму на которую поменять, сейчас стоит {Settings.fix_price}')
+        # await state.set_state(ChangeMoney.change_price)
+
+        # Изменить ценну в связке
+        await callback.message.answer('Выберите первую точку',
+                                      reply_markup=await kb_admin.change_mouney_routes1())
+# ---Изменить ценну в связке----
+@admin.callback_query(IsAdmin(), F.data.startswith('chroute_'))
+async def change_route_callback(callback: CallbackQuery, state: FSMContext):
+    await callback.answer('')
+    city1 = callback.data.split('_')[1]
+    await state.update_data(city1=city1)
+    await callback.message.edit_text('Выберите вторую точку',
+                                  reply_markup=await kb_admin.change_mouney_routes2(city1))
+@admin.callback_query(IsAdmin(), F.data.startswith('finroute_'))
+async def change_route_callback(callback: CallbackQuery, state: FSMContext):
+    await callback.answer('')
+    city2 = callback.data.split('_')[1]
+    await state.update_data(city2=city2)
+    data = await state.get_data()
+    price = await get_cities_routes_price(data['city1'], data['city2'])
+    await callback.message.edit_text(f'{data["city1"]} - {data["city2"]}\n'
+                                     f'Цена <b>{price}</b>\n\n'
+                                     f'Ведите сумму на какую изменить',
+                                     reply_markup=await kb.cancel_order())
+    await state.set_state(ChangeMoney.change_price)
 
 @admin.message(IsAdmin(), ChangeMoney.change_price, F.text)
 async def change_settings_value(message: Message, state: FSMContext):
     input_int = message.text.strip()
     pattern = r"^\d+$"
     if re.match(pattern, input_int):
-        await state.update_data(setting=message.text)
-        Settings.set_fix_price(int(message.text))
-        await message.answer(f'Цена успешна добавлена {Settings.fix_price}')
+        await state.update_data(price=message.text)
+        data = await state.get_data()
+        await get_cities_routes_price_update(data['city1'], data['city2'], data['price'])
+        await message.answer(f'Цена успешна добавлена ')
         await state.clear()
     else:
         await message.answer("Пожалуйста, введите только цифры.")
+# ------------------------------------------
+# @admin.message(IsAdmin(), ChangeMoney.change_price, F.text)
+# async def change_settings_value(message: Message, state: FSMContext):
+#     input_int = message.text.strip()
+#     pattern = r"^\d+$"
+#     if re.match(pattern, input_int):
+#         await state.update_data(setting=message.text)
+#         Settings.set_fix_price(int(message.text))
+#         await message.answer(f'Цена успешна добавлена {Settings.fix_price}')
+#         await state.clear()
+#     else:
+#         await message.answer("Пожалуйста, введите только цифры.")
 
 
 @admin.callback_query(IsAdmin(), or_f(F.data.startswith('chin_'), F.data.startswith('chout_')))
@@ -397,42 +466,6 @@ async def change_settings_callback4(message: Message, state: FSMContext):
         await message.answer("Пожалуйста, введите только цифры.")
 
 
-# class ChangeSettings(StatesGroup):
-#     setting = State()
-#     change_price = State()
-
-# @admin.callback_query(IsAdmin(), F.data == 'distance_rate')
-# async def set_distance_rate(callback: CallbackQuery, state: FSMContext):
-#     await callback.answer('')
-#     await state.update_data(change_price='distance_rate')
-#     await state.set_state(ChangeSettings.setting)
-#     await callback.message.answer('Введите новую цену за километр:\n'
-#                                   'По умолчанию цена 40 за километр', await kb.cancel_order())
-#
-#
-# @admin.callback_query(IsAdmin(), F.data == 'time_rate')
-# async def set_time_rate(callback: CallbackQuery, state: FSMContext):
-#     await callback.answer('')
-#     await state.update_data(change_price='time_rate')
-#     await state.set_state(ChangeSettings.setting)
-#     await callback.message.answer(f'Введите новую цену за минуту:\n'
-#                                   f'По умолчанию цена 10 за минуту', await kb.cancel_order())
-#
-#
-# @admin.message(IsAdmin(), ChangeSettings.setting, F.text)
-# async def change_settings_value(message: Message, state: FSMContext):
-#     await state.update_data(setting=message.text)
-#     Settings.set_fix_price(int(message.text))
-#     await message.answer(f'Цена успешна добавлена {Settings.fix_price}')
-
-# change_price = data.get('change_price')
-# if change_price == 'distance_rate':
-#     Settings.set_distance_rate(int(message.text))
-#     await message.answer(f'Цена за километр успешно изменена {Settings.distance_rate}')
-# elif change_price == 'time_rate':
-#     Settings.set_time_rate(int(message.text))
-# #     await message.answer(f'Цена за минуту успешно изменена {Settings.time_rate}')
-# await state.clear()
 
 # Добавление машины от пользователя
 @admin.callback_query(IsAdmin(), F.data.startswith('addcaradmin_'))
@@ -473,6 +506,11 @@ async def info_car_driver(callback: CallbackQuery):
         # print(data_created)
         # Подсчитываем количество заказов с нулевой стоимостью
         zero_price_orders_count = sum(1 for order in driver_info.orders_reply if order.price == 0)
+        zero_price_orders_info = [
+            {"start_point": order.point_start, "end_point": order.point_end}
+            for order in driver_info.orders_reply if order.price == 0
+        ]
+
 
 
         # Формируем текст сообщения с информацией о водителе
@@ -484,14 +522,20 @@ async def info_car_driver(callback: CallbackQuery):
             f"Общий заработок: <b>{total_earnings} руб.</b>\n"
             f"-------------------------------\n"
         )
+        message_text_point = (
+            f''
+        )
         # Добавляем информацию о заказах с нулевой стоимостью, если такие есть
         if zero_price_orders_count > 0:
             message_text += f"<b>Заказов с нулевой стоимостью: {zero_price_orders_count}</b>\n"
+            for info in zero_price_orders_info:
+                message_text_point += f"Начальная точка: <b>{info['start_point']}</b>\nКонечная точка: <b>{info['end_point']}</b>\n\n"
+
 
         # Создаем словарь для хранения количества заказов по датам
         orders_by_date = {}
         for order in driver_info.orders_reply:
-            date = order.created.date() + timedelta(hours=9)
+            date = order.created.date()
             orders_by_date[date] = orders_by_date.get(date, 0) + 1
 
         # Добавляем информацию о количестве заказов по датам в текст сообщения
@@ -500,6 +544,8 @@ async def info_car_driver(callback: CallbackQuery):
 
         await callback.answer('')
         await callback.message.answer(message_text, reply_markup=await kb.reset_zero(driver_id))
+        if zero_price_orders_count > 0:
+            await callback.message.answer(text=message_text_point)
     else:
         await callback.answer('Информация о водителе не найдена')
 

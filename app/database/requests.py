@@ -1,6 +1,6 @@
 from sqlalchemy.orm import joinedload, selectinload
 
-from app.database.models import User, Order, Driver, OnlineExecution, Base, CityOutside, CityInside
+from app.database.models import User, Order, Driver, OnlineExecution, Base, CityOutside, CityInside, CityRoutes
 from app.database.models import async_session
 
 from sqlalchemy import select, update, delete, desc
@@ -38,6 +38,34 @@ async def get_cities_outside():
         city = await sesssion.scalars(select(CityOutside))
         return city
 
+async def get_cities_routes1():
+    async with async_session() as session:
+        query = select(CityRoutes.city1).distinct()
+        result = await session.execute(query)
+        unique_routes = result.fetchall()
+        return unique_routes
+async def get_cities_routes2(city1: str):
+    async with async_session() as session:
+        city2 = await session.scalars(select(CityRoutes.city2).where(CityRoutes.city1 == city1))
+        return city2
+async def get_cities_routes_price(city1: str, city2:str):
+    async with async_session() as session:
+        price = await session.scalar(
+            select(CityRoutes.price)
+            .where((CityRoutes.city1 == city1) & (CityRoutes.city2 == city2))
+        )
+        return price
+
+async def get_cities_routes_price_update(city1: str, city2: str, price: int):
+    async with async_session() as session:
+        price = (
+            update(CityRoutes)
+            .where((CityRoutes.city1 == city1) & (CityRoutes.city2 == city2))
+            .values(price=price)
+            .execution_options(synchronize_session="fetch")
+        )
+        await session.execute(price)
+        await session.commit()
 
 async def set_order(user_id, data):
     async with async_session() as session:
@@ -98,6 +126,13 @@ async def active_driver(tg_id, is_start=True):
         driver = await session.scalar(select(Driver).where(Driver.tg_id == tg_id))
         driver.active = is_start
         await session.commit()
+
+async def no_active(driver_id, is_start=False):
+    async with async_session() as session:
+        driver = await session.scalar(select(Driver).where(Driver.id == driver_id))
+        driver.active = is_start
+        await session.commit()
+
 
 
 async def get_all_car():
@@ -411,3 +446,76 @@ async def shop_add(user_id, shop_name, shop_activate=True):
 #         for city, price in cities.items():
 #             session.add(CityInside(city_name=city, price=price))
 #         await session.commit()
+
+
+# routes = {
+#     ('Р-н военного городка', 'Западянка+Куйбышевская'): 100,
+#     ('Р-н военного городка', 'Восточный'): 150,
+#     ('Р-н военного городка', 'Восточный за ж/д'): 200,
+#     ('Р-н военного городка', 'Центр'): 100,
+#     ('Р-н военного городка', 'от Советской до речки'): 150,
+#     ('Р-н военного городка', 'Полигон'): 350,
+#     ('Р-н военного городка', 'Агрохолдинг'): 350,
+#     ('Р-н военного городка', 'Таёжный'): 200,
+#     ('Р-н военного городка', 'Р-н военного городка'): 100,
+#
+#     ('Западянка+Куйбышевская', 'Восточный'): 150,
+#     ('Западянка+Куйбышевская', 'Восточный за ж/д'): 200,
+#     ('Западянка+Куйбышевская', 'Центр'): 150,
+#     ('Западянка+Куйбышевская', 'от Советской до речки'): 150,
+#     ('Западянка+Куйбышевская', 'Полигон'): 400,
+#     ('Западянка+Куйбышевская', 'Агрохолдинг'): 350,
+#     ('Западянка+Куйбышевская', 'Таёжный'): 200,
+#     ('Западянка+Куйбышевская', 'Западянка+Куйбышевская'): 100,
+#
+#     ('Восточный', 'Восточный за ж/д'): 150,
+#     ('Восточный', 'Центр'): 100,
+#     ('Восточный', 'от Советской до речки'): 150,
+#     ('Восточный', 'Полигон'): 450,
+#     ('Восточный', 'Агрохолдинг'): 350,
+#     ('Восточный', 'Таёжный'): 250,
+#     ('Восточный', 'Восточный'): 100,
+#
+#     ('Восточный за ж/д', 'Центр'): 200,
+#     ('Восточный за ж/д', 'от Советской до речки'): 200,
+#     ('Восточный за ж/д', 'Полигон'): 500,
+#     ('Восточный за ж/д', 'Агрохолдинг'): 400,
+#     ('Восточный за ж/д', 'Таёжный'): 500,
+#     ('Восточный за ж/д', 'Восточный за ж/д'): 200,
+#
+#     ('Центр', 'от Советской до речки'): 100,
+#     ('Центр', 'Полигон'): 400,
+#     ('Центр', 'Агрохолдинг'): 350,
+#     ('Центр', 'Таёжный'): 250,
+#     ('Центр', 'Центр'): 100,
+#
+#     ('от Советской до речки', 'Полигон'): 450,
+#     ('от Советской до речки', 'Агрохолдинг'): 300,
+#     ('от Советской до речки', 'Таёжный'): 300,
+#     ('от Советской до речки', 'от Советской до речки'): 100,
+#
+#     ('Полигон', 'Агрохолдинг'): 700,
+#     ('Полигон', 'Таёжный'): 350,
+#     ('Полигон', 'Полигон'): 100,
+#
+#     ('Агрохолдинг', 'Таёжный'): 550,
+#     ('Агрохолдинг', 'Агрохолдинг'): 100,
+# }
+#
+#
+# async def test_driver():
+#     async with async_session() as session:
+#         for (city1, city2), price in routes.items():
+#             route = CityRoutes(city1=city1, city2=city2, price=price)
+#             session.add(route)
+#         await session.commit()
+
+async def get_route_price(city1: str, city2: str):
+    async with async_session() as session:
+        route = select(CityRoutes).where(
+            ((CityRoutes.city1 == city1) & (CityRoutes.city2 == city2)) |
+            ((CityRoutes.city1 == city2) & (CityRoutes.city2 == city1))
+        )
+        result = await session.execute(route)
+        route = result.scalar_one_or_none()
+        return route.price if route else None

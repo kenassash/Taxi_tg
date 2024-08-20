@@ -8,7 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncAttrs, async_sessionmaker, create_async_
 from dotenv import load_dotenv
 
 load_dotenv()
-engine = create_async_engine(url=os.getenv('ENGINE'), echo=True)
+engine = create_async_engine(url=os.getenv('ENGINE'), echo=False)
 
 async_session = async_sessionmaker(engine)
 
@@ -73,7 +73,7 @@ class Driver(Base):
     name: Mapped[str] = mapped_column(String(100), nullable=True)
     phone: Mapped[int] = mapped_column(nullable=True)
     car_name: Mapped[str] = mapped_column(String(100), nullable=True)
-    number_car: Mapped[int] = mapped_column(nullable=True)
+    number_car: Mapped[str] = mapped_column(String(100), nullable=True)
     photo_car: Mapped[str] = mapped_column(String(150), nullable=True)
 
     active: Mapped[bool] = mapped_column(Boolean, default=True)
@@ -97,6 +97,13 @@ class CityOutside(Base):
     city_name: Mapped[str] = mapped_column(String(255), nullable=True)
     price: Mapped[int] = mapped_column(nullable=True)
 
+class CityRoutes(Base):
+    __tablename__ = 'city_routes'
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    city1: Mapped[str] = mapped_column(String(255), nullable=True)
+    city2: Mapped[str] = mapped_column(String(255), nullable=True)
+    price: Mapped[int] = mapped_column(nullable=True)
 
 class OnlineExecution(Base):
     __tablename__ = 'order_executions'

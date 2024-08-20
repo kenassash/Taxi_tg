@@ -24,7 +24,6 @@ class TimeRestrictionMiddleware(BaseMiddleware):
             event: TelegramObject,
             data: Dict[str, Any],
     ) -> Any:
-        print(f"Middleware active status: {self.active}")
         if not self.active:
             return await handler(event, data)
         else:

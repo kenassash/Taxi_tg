@@ -16,7 +16,7 @@ import app.keyboard_city as kb_city
 from app.change_price import Settings
 from app.geolocation import coords_to_address, addess_to_coords
 from app.database.requests import set_user, set_order, get_all_orders, get_driver, active_driver, get_user, add_car, \
-    up_price_passager, shop_add, get_order_driver, delete_order_pass
+    up_price_passager, shop_add, get_order_driver, delete_order_pass, get_route_price
 from filters.chat_type import ChatTypeFilter
 from app.calculate import length_way
 from middleware.ban_middleware import CheckUserBannedMiddleware
@@ -139,7 +139,7 @@ async def process_invalid_phone(message: Message):
 async def neworder(callback: CallbackQuery, state: FSMContext):
     await callback.answer('')
     await callback.message.edit_text(
-        f'<b>🅰️: Выберите населенный пункт откуда поедите:</b>',
+        f'<b>🅰️: Выберите откуда поедите:</b>',
         reply_markup=await kb_city.keyboard_city1())
     await state.set_state(AddOrder.city1)
 
@@ -150,7 +150,7 @@ async def city1(callback: CallbackQuery, state: FSMContext):
     await callback.answer('')
     if callback.data.startswith('citiesoutside1_'):
         await callback.message.edit_text(
-            f'<b>🅰️: Выберите населенный пункт откуда поедите:</b>',
+            f'<b>🅰️: Выберите откуда поедите:</b>',
             reply_markup=await kb_city.keyboard_city3())
         await state.set_state(AddOrder.city1)
         return
@@ -175,7 +175,7 @@ async def address1(message: Message, state: FSMContext):
     await state.update_data(address1=message.text)
     data = await state.get_data()
     await message.answer(f'<b>🅰️: {data["city1"]} - {data["address1"]}\n\n'
-                         f'🅱️: Выберите населенный пункт куда поедите:</b>',
+                         f'🅱️: Выберите куда поедите:</b>',
                          reply_markup=await kb_city.keyboard_city2())
     await state.set_state(AddOrder.city2)
 
@@ -192,7 +192,7 @@ async def city2(callback: CallbackQuery, state: FSMContext):
     if callback.data.startswith('citiesoutside2_'):
         data = await state.get_data()
         await callback.message.edit_text(f'<b>🅰️: {data["city1"]} - {data["address1"]}\n\n'
-                                         f'🅱️: Выберите населенный пункт куда поедите:</b>',
+                                         f'🅱️: Выберите куда поедите:</b>',
                                          reply_markup=await kb_city.keyboard_city4())
         await state.set_state(AddOrder.city2)
         return
@@ -210,6 +210,29 @@ async def city2(callback: CallbackQuery, state: FSMContext):
 async def city2(message: Message, state: FSMContext):
     await message.answer('Выберите кнопку населенного пункта')
 
+# связка изменние цены индивидуально
+# def bundle(data, price):
+#     if (data['city1'] == 'Западянка+Куйбышевская' and data['city2'] == 'Центр') \
+#             or (data['city1'] == 'Центр' and data['city2'] == 'Западянка+Куйбышевская'):
+#         price += Settings.fix_price
+#         return price
+#     elif (data['city1'] == 'Восточный' and data['city2'] == 'Восточный за ж/д') \
+#             or (data['city1'] == 'Восточный за ж/д' and data['city2'] == 'Восточный'):
+#         price -= Settings.fix_price
+#         return price
+#     elif (data['city1'] == 'Восточный за ж/д' and data['city2'] == 'Таёжный') \
+#             or (data['city1'] == 'Таёжный' and data['city2'] == 'Восточный за ж/д'):
+#         price += Settings.fix_price
+#         return price
+#     elif (data['city1'] == 'Восточный' and data['city2'] == 'Таёжный') \
+#             or (data['city1'] == 'Таёжный' and data['city2'] == 'Восточный'):
+#         price += Settings.fix_price
+#         return price
+#     elif (data['city1'] == 'Западянка+Куйбышевская' and data['city2'] == 'Восточный') \
+#             or (data['city1'] == 'Восточный' and data['city2'] == 'Западянка+Куйбышевская'):
+#         price += Settings.fix_price
+#         return price
+#     return price
 
 @router.message(AddOrder.address2, F.text)
 async def address2(message: Message, state: FSMContext):
@@ -218,27 +241,18 @@ async def address2(message: Message, state: FSMContext):
     point_start = f'{data["city1"]} - {data["address1"]}'
     point_end = f'{data["city2"]} - {data["address2"]}'
 
-    price1 = data['price1']
-    price2 = data['price2']
-    price = max(int(price1), int(price2))
-    # -----------------------------no coment-----------
-    if (data['city1'] == 'Западянка+Куйбышевская' and data['city2'] == 'Центр') \
-            or (data['city1'] == 'Центр' and data['city2'] == 'Западянка+Куйбышевская'):
-        price += Settings.fix_price
-    elif (data['city1'] == 'Восточный' and data['city2'] == 'Восточный за ж/д') \
-            or (data['city1'] == 'Восточный за ж/д' and data['city2'] == 'Восточный'):
-        price -= Settings.fix_price
-    elif (data['city1'] == 'Восточный за ж/д' and data['city2'] == 'Таёжный') \
-            or (data['city1'] == 'Таёжный' and data['city2'] == 'Восточный за ж/д'):
-        price += Settings.fix_price
-    elif (data['city1'] == 'Восточный' and data['city2'] == 'Таёжный') \
-            or (data['city1'] == 'Таёжный' and data['city2'] == 'Восточный'):
-        price += Settings.fix_price
-    elif (data['city1'] == 'Западянка+Куйбышевская' and data['city2'] == 'Восточный') \
-            or (data['city1'] == 'Восточный' and data['city2'] == 'Западянка+Куйбышевская'):
-        price += Settings.fix_price
+    # price1 = data['price1']
+    # price2 = data['price2']
+    # price = max(int(price1), int(price2))
 
-    # -----------------------------no coment-----------
+    # связка изменние цены индивидуально
+    price = await get_route_price(data['city1'], data['city2'])
+    if price == None:
+        price1 = data['price1']
+        price2 = data['price2']
+        price = max(int(price1), int(price2))
+
+
     user_id = await get_user(message.from_user.id)
     if user_id.free_ride == 0:
         price = 0
@@ -261,30 +275,21 @@ async def finish_price(callback: CallbackQuery, state: FSMContext, bot: Bot):
     point_start = f'{data["city1"]} - {data["address1"]}'
     point_end = f'{data["city2"]} - {data["address2"]}'
 
-    price1 = data['price1']
-    price2 = data['price2']
-    price = max(int(price1), int(price2))
-    # -----------------------------no coment-----------
-    if (data['city1'] == 'Западянка+Куйбышевская' and data['city2'] == 'Центр') \
-            or (data['city1'] == 'Центр' and data['city2'] == 'Западянка+Куйбышевская'):
-        price += Settings.fix_price
-    elif (data['city1'] == 'Восточный' and data['city2'] == 'Восточный за ж/д') \
-            or (data['city1'] == 'Восточный за ж/д' and data['city2'] == 'Восточный'):
-        price -= Settings.fix_price
-    elif (data['city1'] == 'Восточный за ж/д' and data['city2'] == 'Таёжный') \
-            or (data['city1'] == 'Таёжный' and data['city2'] == 'Восточный за ж/д'):
-        price += Settings.fix_price
-    elif (data['city1'] == 'Восточный' and data['city2'] == 'Таёжный') \
-            or (data['city1'] == 'Таёжный' and data['city2'] == 'Восточный'):
-        price += Settings.fix_price
-    elif (data['city1'] == 'Западянка+Куйбышевская' and data['city2'] == 'Восточный') \
-            or (data['city1'] == 'Восточный' and data['city2'] == 'Западянка+Куйбышевская'):
-        price += Settings.fix_price
+    # price1 = data['price1']
+    # price2 = data['price2']
+    # price = max(int(price1), int(price2))
+
+    # связка изменние цены индивидуально
+    price = await get_route_price(data['city1'], data['city2'])
+    if price == None:
+        price1 = data['price1']
+        price2 = data['price2']
+        price = max(int(price1), int(price2))
 
     user_id = await get_user(callback.from_user.id)
     if user_id.free_ride == 0:
         price = 0
-    # -----------------------------no coment-----------
+
 
     await state.clear()
     await state.update_data(point_start=point_start, point_end=point_end, price=price)
@@ -358,7 +363,6 @@ async def upprice_order_passager(callback: CallbackQuery, bot: Bot, state: FSMCo
     order_id_id = callback.data.split('_')[1]
     state_data = await state.get_data()
     message_id = state_data.get('message_id')
-    print(message_id)
 
     price = 20
     order_id = await up_price_passager(order_id_id, price)
