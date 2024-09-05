@@ -210,29 +210,6 @@ async def city2(callback: CallbackQuery, state: FSMContext):
 async def city2(message: Message, state: FSMContext):
     await message.answer('Выберите кнопку населенного пункта')
 
-# связка изменние цены индивидуально
-# def bundle(data, price):
-#     if (data['city1'] == 'Западянка+Куйбышевская' and data['city2'] == 'Центр') \
-#             or (data['city1'] == 'Центр' and data['city2'] == 'Западянка+Куйбышевская'):
-#         price += Settings.fix_price
-#         return price
-#     elif (data['city1'] == 'Восточный' and data['city2'] == 'Восточный за ж/д') \
-#             or (data['city1'] == 'Восточный за ж/д' and data['city2'] == 'Восточный'):
-#         price -= Settings.fix_price
-#         return price
-#     elif (data['city1'] == 'Восточный за ж/д' and data['city2'] == 'Таёжный') \
-#             or (data['city1'] == 'Таёжный' and data['city2'] == 'Восточный за ж/д'):
-#         price += Settings.fix_price
-#         return price
-#     elif (data['city1'] == 'Восточный' and data['city2'] == 'Таёжный') \
-#             or (data['city1'] == 'Таёжный' and data['city2'] == 'Восточный'):
-#         price += Settings.fix_price
-#         return price
-#     elif (data['city1'] == 'Западянка+Куйбышевская' and data['city2'] == 'Восточный') \
-#             or (data['city1'] == 'Восточный' and data['city2'] == 'Западянка+Куйбышевская'):
-#         price += Settings.fix_price
-#         return price
-#     return price
 
 @router.message(AddOrder.address2, F.text)
 async def address2(message: Message, state: FSMContext):
@@ -436,24 +413,6 @@ async def get_manager(message: Message, state: FSMContext, bot: Bot):
         await message.answer('Отправь текстовое сообщение')
 
 
-# ----------------Команды для Таксистов---------------
-# ----------------Выйти на линию ---------------------
-# @router.callback_query(F.data.startswith('driverstart_'))
-# async def driver_start(callback: CallbackQuery):
-#     await callback.answer('')
-#     await active_driver(callback.message.chat.id, is_start=True)
-#     await callback.message.edit_text('Вы вышли на линию')
-#
-#
-# # ----------------Уйти с линии на линию ---------------------
-# @router.callback_query(F.data.startswith('driverfinish_'))
-# async def driver_finish(callback: CallbackQuery):
-#     await callback.answer('')
-#     await active_driver(callback.message.chat.id, is_start=False)
-#     await callback.message.edit_text('Вы ушли с линии')
-
-
-# подать заявку в такси
 
 class AddDrivercar(StatesGroup):
     phone = State()

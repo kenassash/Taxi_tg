@@ -99,7 +99,7 @@ async def keyboard_city1():
                                           callback_data=f'cities1_{city.city_name}_{city.price}'))
     keyboard.add(InlineKeyboardButton(text='Другой нп', callback_data=f'citiesoutside1_'))
     keyboard.add(InlineKeyboardButton(text='Отменить', callback_data=f'cancelorder_'))
-    return keyboard.adjust(1).as_markup()
+    return keyboard.adjust(2).as_markup()
 
 
 async def keyboard_city2():
@@ -112,7 +112,7 @@ async def keyboard_city2():
     keyboard.add(InlineKeyboardButton(text='Другой нп', callback_data=f'citiesoutside2_'))
     keyboard.add(InlineKeyboardButton(text='Отменить', callback_data=f'cancelorder_'))
     keyboard.add(InlineKeyboardButton(text='Назад', callback_data=f'backbutton_'))
-    return keyboard.adjust(1).as_markup()
+    return keyboard.adjust(2).as_markup()
 
 
 async def keyboard_city3():

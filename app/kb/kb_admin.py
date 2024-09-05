@@ -17,6 +17,7 @@ async def admin_keyboard():
     keyboard.add(InlineKeyboardButton(text='Время сна', callback_data='time_restriction'))
     keyboard.add(InlineKeyboardButton(text='На линии', callback_data='online'))
     keyboard.add(InlineKeyboardButton(text='Запрет водителю', callback_data='driver_block'))
+    keyboard.add(InlineKeyboardButton(text='Инф-ия о заказе', callback_data='info_order'))
     return keyboard.adjust(2).as_markup()
 
 

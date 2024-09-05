@@ -91,8 +91,8 @@ async def accept(callback: CallbackQuery, bot: Bot, state: FSMContext):
             message_id=message_pass.message_id,
             reply_markup=await kb.delete_order(order_id.id, message_driver.message_id))
 
-        await callback.message.edit_text(text=f'Такси бот\n'
-                                              f'Водитель {driver.name} принял заказ',
+        await callback.message.edit_text(text=f'Номер заказа - <b><code>{order_id.id}</code></b>\n'
+                                         f'Водитель {driver.name} принял заказ',
                                          reply_markup=await kb.go_to_order())
 
 
