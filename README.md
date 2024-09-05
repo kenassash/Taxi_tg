@@ -56,8 +56,8 @@
 ## Скриншоты
 
 ![Скриншот Такси бот](https://github.com/kenassash/Taxi_tg/blob/master/img/1.png)
-![Скриншот Панель](https://github.com/kenassash/Taxi_tg/tree/master/img2.png)
-![Скриншот Заказ](https://github.com/kenassash/Taxi_tg/tree/master/img3.png)
-![Скриншот Сделать заказ](https://github.com/kenassash/Taxi_tg/tree/master/img4.png)
-![Скриншот Админ панель](https://github.com/kenassash/Taxi_tg/tree/master/img5.png)
-![Скриншот Информация о заказе](https://github.com/kenassash/Taxi_tg/tree/master/img6.png)
+![Скриншот Панель](https://github.com/kenassash/Taxi_tg/blob/master/img/2.png)
+![Скриншот Заказ](https://github.com/kenassash/Taxi_tg/blob/master/img/3.png)
+![Скриншот Сделать заказ](https://github.com/kenassash/Taxi_tg/blob/master/img/4.png)
+![Скриншот Админ панель](https://github.com/kenassash/Taxi_tg/blob/master/img/5.png)
+![Скриншот Информация о заказе](https://github.com/kenassash/Taxi_tg/blob/master/img/6.png)
