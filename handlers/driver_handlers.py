@@ -68,12 +68,16 @@ async def timewait(callback: CallbackQuery, bot: Bot):
 
         message_pass = await bot.send_photo(chat_id=order_id.user_rel.tg_id,
                                             photo=driver.photo_car,
-                                            caption=f'Номер телефона:<b> +{driver.phone}</b>\n\n'
-                                                    f'Автомобиль:<b> {driver.car_name}</b>\n\n'
-                                                    f'Номер: <b>{driver.number_car}</b>\n\n'
-                                                    f'Цена поездки: <b>{order_id.price}Р</b>\n\n'
-                                                    f'Будет у вас через <b>{time_wait} мин.</b>')
-
+                                            caption=f'⏳Время прибытия {time_wait} мин\n'
+                                                    f'👤{driver.name} на {driver.car_name}\n'
+                                                    f'🚕Номер авто: {driver.number_car}\n'
+                                                    f'📞Телефон: +{driver.phone}\n'
+                                                    f'💰Цена поездки: {order_id.price} руб')
+                                            # caption = f'Номер телефона:<b> +{driver.phone}</b>\n\n'
+                                            # f'Автомобиль:<b> {driver.car_name}</b>\n\n'
+                                            # f'Номер: <b>{driver.number_car}</b>\n\n'
+                                            # f'Цена поездки: <b>{order_id.price}Р</b>\n\n'
+                                            # f'Будет у вас через <b>{time_wait} мин.</b>')
         message_driver = await callback.message.edit_text(f"Заказ <b>{order_id.id}</b>\n\n"
                                                           f"Телефон <b>+{order_id.user_rel.phone}</b>\n\n"
                                                           f"Начальная точка: <b>{order_id.point_start}</b>\n\n"
@@ -105,11 +109,16 @@ async def on_the_spot(callback: CallbackQuery, bot: Bot):
 
         message_pass = await bot.send_photo(chat_id=order_id.user_rel.tg_id,
                                             photo=driver.photo_car,
-                                            caption=f'<b>Водитель приехал за вами ✅🚕</b>\n\n'
-                                                    f'Номер телефона:<b> +{driver.phone}</b>\n\n'
-                                                    f'Автомобиль:<b> {driver.car_name}</b>\n\n'
-                                                    f'Номер: <b>{driver.number_car}</b>\n\n'
-                                                    f'Цена поездки: <b>{order_id.price}Р</b>\n\n')
+                                            caption=f'🎯Водитель приехал🎯\n'
+                                                    f'👤{driver.name} на {driver.car_name}\n'
+                                                    f'🚕Номер авто: {driver.number_car}\n'
+                                                    f'📞Телефон: +{driver.phone}\n'
+                                                    f'💰Цена поездки: {order_id.price} руб')
+                                            # caption = f'<b>Водитель <b>{driver.name}</b> приехал за вами ✅🚕</b>\n\n'
+                                            # f'Номер телефона:<b> +{driver.phone}</b>\n\n'
+                                            # f'Автомобиль:<b> {driver.car_name}</b>\n\n'
+                                            # f'Номер: <b>{driver.number_car}</b>\n\n'
+                                            # f'Цена поездки: <b>{order_id.price}Р</b>\n\n')
         message_driver = await callback.message.edit_text(f"Заказ <b>{order_id.id}</b>\n\n"
                                                           f"Телефон <b>+{order_id.user_rel.phone}</b>\n\n"
                                                           f"Начальная точка: <b>{order_id.point_start}</b>\n\n"

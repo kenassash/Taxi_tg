@@ -67,11 +67,16 @@ async def accept(callback: CallbackQuery, bot: Bot, state: FSMContext):
 
         message_pass = await bot.send_photo(chat_id=order_id.user_rel.tg_id,
                                             photo=driver.photo_car,
-                                            caption=f'Водитель принял ваше предложение 🤝\n\n'
-                                                    f'Номер телефона:<b> +{driver.phone}</b>\n\n'
-                                                    f'Автомобиль:<b> {driver.car_name}</b>\n\n'
-                                                    f'Номер: <b>{driver.number_car}</b>\n\n'
-                                                    f'Цена поездки: <b>{order_id.price}Р</b>\n\n')
+                                            caption=f'🤝Ваш заказ принят\n'
+                                                    f'👤{driver.name} на {driver.car_name}\n'
+                                                    f'🚕Номер авто: {driver.number_car}\n'
+                                                    f'📞Телефон: +{driver.phone}\n'
+                                                    f'💰Цена поездки: {order_id.price} руб\n')
+                                            # caption=f'Водитель <b>{driver.name}</b> принял ваше предложение 🤝\n\n'
+                                            #         f'Номер телефона:<b> +{driver.phone}</b>\n\n'
+                                            #         f'Автомобиль:<b> {driver.car_name}</b>\n\n'
+                                            #         f'Номер: <b>{driver.number_car}</b>\n\n'
+                                            #         f'Цена поездки: <b>{order_id.price}Р</b>\n\n')
 
         # Обновляем состояние, сохраняя идентификатор отправленного сообщения
 

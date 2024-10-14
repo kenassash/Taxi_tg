@@ -1,4 +1,4 @@
 /.env
 /.venv/
 
-/db.sqlite3
+/db1.sqlite3

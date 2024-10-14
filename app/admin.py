@@ -568,9 +568,9 @@ async def info_car_driver(callback: CallbackQuery):
             f''
         )
 
-        message_text_id = (
-            f''
-        )
+        # message_text_id = (
+        #     f''
+        # )
 
         # Добавляем информацию о заказах с нулевой стоимостью, если такие есть
         if zero_price_orders_count > 0:
@@ -583,7 +583,7 @@ async def info_car_driver(callback: CallbackQuery):
         for order in driver_info.orders_reply:
             date = order.created.date()
             orders_by_date[date] = orders_by_date.get(date, 0) + 1
-            message_text_id += f'<code>{order.id}</code>, '
+            # message_text_id += f'<code>{order.id}</code>, '
 
         # Добавляем информацию о количестве заказов по датам в текст сообщения
         for date, count in orders_by_date.items():
@@ -593,8 +593,8 @@ async def info_car_driver(callback: CallbackQuery):
         await callback.message.answer(message_text, reply_markup=await kb.reset_zero(driver_id))
         if zero_price_orders_count > 0:
             await callback.message.answer(text=message_text_point)
-        if total_orders > 0 :
-            await callback.message.answer(text=message_text_id)
+        # if total_orders > 0 :
+        #     await callback.message.answer(text=message_text_id)
     else:
         await callback.answer('Информация о водителе не найдена')
 

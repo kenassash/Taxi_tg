@@ -122,7 +122,7 @@ async def process_phone(message: Message, state: FSMContext):
     user = await get_user(tg_id)
 
     # Приветствие пользователя после успешной записи
-    await message.answer(f'Вы зарегестрировались', reply_markup=ReplyKeyboardRemove())
+    await message.answer(f'Вы зарегистрировались', reply_markup=ReplyKeyboardRemove())
     await message.answer(f'<b>Добро пожаловать, {message.from_user.full_name}!</b> 😊\n\n'
                          f'До бесплатной поездки осталось <b>{Settings.free_ride - user.free_ride}</b>',
                          reply_markup=await kb.main())
