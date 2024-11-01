@@ -55,9 +55,9 @@ async def phone():
     return keyboard
 
 
-async def accept(order_id, messege_id):
+async def accept(order_id):
     keyboard = InlineKeyboardBuilder()
-    keyboard.add(InlineKeyboardButton(text='Принять заказ', callback_data=f'accept_{order_id}_{messege_id}'))
+    keyboard.add(InlineKeyboardButton(text='Принять заказ', callback_data=f'accept_{order_id}'))
     return keyboard.adjust().as_markup()
 
 
@@ -77,18 +77,18 @@ async def on_the_spot_kb(order_id, message_id):
     return keyboard.adjust(1, 1, 1).as_markup()
 
 
-async def time_wait(order_id, messege_id):
+async def time_wait(order_id):
     keyboard = InlineKeyboardBuilder()
-    keyboard.add(InlineKeyboardButton(text='2-3 мин.', callback_data=f'timewait_{order_id}_3_{messege_id}'))
-    keyboard.add(InlineKeyboardButton(text='5 мин.', callback_data=f'timewait_{order_id}_5_{messege_id}'))
-    keyboard.add(InlineKeyboardButton(text='8 мин.', callback_data=f'timewait_{order_id}_8_{messege_id}'))
-    keyboard.add(InlineKeyboardButton(text='10 мин.', callback_data=f'timewait_{order_id}_10_{messege_id}'))
-    keyboard.add(InlineKeyboardButton(text='15 мин.', callback_data=f'timewait_{order_id}_15_{messege_id}'))
-    keyboard.add(InlineKeyboardButton(text='20 мин.', callback_data=f'timewait_{order_id}_20_{messege_id}'))
-    keyboard.add(InlineKeyboardButton(text='На месте 🎯', callback_data=f'onthespot_{order_id}_{messege_id}'))
-    keyboard.add(InlineKeyboardButton(text='Отказаться 🤦‍♂️', callback_data=f'close_{order_id}_{messege_id}'))
+    keyboard.add(InlineKeyboardButton(text='2-3 мин.', callback_data=f'timewait_{order_id}_3'))
+    keyboard.add(InlineKeyboardButton(text='5 мин.', callback_data=f'timewait_{order_id}_5'))
+    keyboard.add(InlineKeyboardButton(text='8 мин.', callback_data=f'timewait_{order_id}_8'))
+    keyboard.add(InlineKeyboardButton(text='10 мин.', callback_data=f'timewait_{order_id}_10'))
+    keyboard.add(InlineKeyboardButton(text='15 мин.', callback_data=f'timewait_{order_id}_15'))
+    keyboard.add(InlineKeyboardButton(text='20 мин.', callback_data=f'timewait_{order_id}_20'))
+    keyboard.add(InlineKeyboardButton(text='На месте 🎯', callback_data=f'onthespot_{order_id}'))
+    keyboard.add(InlineKeyboardButton(text='Отказаться 🤦‍♂️', callback_data=f'close_{order_id}'))
     # keyboard.add(InlineKeyboardButton(text='Отменить заказ ❌', callback_data=f'deleteorder_{order_id}_{messege_id}'))
-    keyboard.add(InlineKeyboardButton(text='Завершить ✅', callback_data=f'finish_{order_id}_{messege_id}'))
+    keyboard.add(InlineKeyboardButton(text='Завершить ✅', callback_data=f'finish_{order_id}'))
 
     return keyboard.adjust(6, 1, 1, 1).as_markup()
 
@@ -129,10 +129,10 @@ async def cancel_order():
     return keyboard.adjust().as_markup()
 
 
-async def delete_order(order_id, message_id):
+async def delete_order(order_id):
     keyboard = InlineKeyboardBuilder()
     keyboard.add(InlineKeyboardButton(text='❌ Отменить заказ',
-                                      callback_data=f'deleteorder_{order_id}_{message_id}'))
+                                      callback_data=f'deleteorder_{order_id}'))
     return keyboard.adjust().as_markup()
 
 

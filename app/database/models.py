@@ -37,7 +37,6 @@ class User(Base):
     shop_name: Mapped[str] = mapped_column(String(255), nullable=True)
     free_ride: Mapped[int] = mapped_column(default=1)
 
-
     order_rel: Mapped[List['Order']] = relationship(back_populates='user_rel')
 
 
@@ -45,20 +44,19 @@ class Order(Base):
     __tablename__ = 'orders'
 
     id: Mapped[int] = mapped_column(primary_key=True)
-
     user: Mapped[int] = mapped_column(ForeignKey('users.id'))
 
-    point_start: Mapped[str] = mapped_column(String(200), nullable=True)
-    point_end: Mapped[str] = mapped_column(String(200), nullable=True)
+    city1_id: Mapped[str] = mapped_column(String(200), nullable=True)
+    city2_id: Mapped[str] = mapped_column(String(200), nullable=True)
 
-    distance: Mapped[int] = mapped_column(nullable=True)
-    time_way: Mapped[int] = mapped_column(nullable=True)
+    address1_id: Mapped[str] = mapped_column(String(200), nullable=True)
+    address2_id: Mapped[str] = mapped_column(String(200), nullable=True)
+
+    add_address: Mapped[str] = mapped_column(String(200), nullable=True)
     price: Mapped[int] = mapped_column(nullable=True)
 
-    coordinat_start_x: Mapped[float] = mapped_column(nullable=True)
-    coordinat_start_y: Mapped[float] = mapped_column(nullable=True)
-    coordinat_end_x: Mapped[float] = mapped_column(nullable=True)
-    coordinat_end_y: Mapped[float] = mapped_column(nullable=True)
+    chat_id_user: Mapped[str] = mapped_column(String(100), nullable=True)
+    chat_id_driver: Mapped[str] = mapped_column(String(100), nullable=True)
 
     drivers_reply: Mapped[List['Driver']] = relationship(back_populates='orders_reply',
                                                          secondary='order_executions')
@@ -97,6 +95,7 @@ class CityOutside(Base):
     city_name: Mapped[str] = mapped_column(String(255), nullable=True)
     price: Mapped[int] = mapped_column(nullable=True)
 
+
 class CityRoutes(Base):
     __tablename__ = 'city_routes'
 
@@ -104,6 +103,7 @@ class CityRoutes(Base):
     city1: Mapped[str] = mapped_column(String(255), nullable=True)
     city2: Mapped[str] = mapped_column(String(255), nullable=True)
     price: Mapped[int] = mapped_column(nullable=True)
+
 
 class OnlineExecution(Base):
     __tablename__ = 'order_executions'

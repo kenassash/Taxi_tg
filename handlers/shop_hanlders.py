@@ -8,7 +8,7 @@ from aiogram.types import CallbackQuery, Message
 from dotenv import load_dotenv
 
 from app.database.requests import get_all_orders, get_driver, delete_order_execution, delete_order_pass, \
-    get_order_driver, get_user, set_order, shop_order_add
+    get_order_driver, get_user, set_order, shop_order_add, set_chat_id_driver, set_chat_id_user
 from filters.chat_type import ChatTypeFilter
 import app.keyboards as kb
 import app.kb.kb_shop as kb_sh
@@ -31,8 +31,8 @@ async def shop_price(callback: CallbackQuery, state: FSMContext, bot: Bot):
     user_id = await get_user(callback.from_user.id)
     price = callback.data.split('_')[1]
     data = {
-        'point_start': 'Магазин ' + user_id.shop_name,
-        'point_end': 'Магазин ' + user_id.shop_name,
+        'city1_id': 'Магазин ' + user_id.shop_name,
+        'city2_id': 'Магазин ' + user_id.shop_name,
         'price': price
     }
     order_id = await set_order(user_id.id, data)
@@ -40,14 +40,16 @@ async def shop_price(callback: CallbackQuery, state: FSMContext, bot: Bot):
     message_id = None
 
     sent_driver_message = await callback.message.edit_text(f"<b>Ожидайте водителя⌛</b>",
-                                                           reply_markup=await kb.delete_order(order_id, message_id))
+                                                           reply_markup=await kb.delete_order(order_id))
 
     sent_message = await bot.send_message(chat_id=os.getenv('CHAT_GROUP_ID'),
                                           text=f"Магазин '<b>{user_id.shop_name}</b>' доставка!\n"
                                                f"Цена: <b>{price}Р</b>",
-                                          reply_markup=await kb.accept(order_id, sent_driver_message.message_id))
+                                          reply_markup=await kb.accept(order_id))
+    await set_chat_id_driver(order_data.id, sent_driver_message.message_id)
+    await set_chat_id_user(order_data.id, sent_message.message_id)
     await state.clear()
-    await state.update_data(message_id=sent_message.message_id)
+    # await state.update_data(message_id=sent_message.message_id)
 
 
 class ShopPointend(StatesGroup):
@@ -67,7 +69,7 @@ async def shop_add_point(callback: CallbackQuery, state: FSMContext, bot: Bot):
 @shop_router.message(ShopPointend.send_pont_end, F.text)
 async def shop_point_end_addres(message: Message, state: FSMContext):
     if message.text:
-        await state.update_data(point_end=message.text)
+        await state.update_data(address2_id=message.text)
         await message.answer(f'Введите сумму за доставку')
         await state.set_state(ShopPointend.price_shop)
     else:
@@ -81,19 +83,21 @@ async def shop_point_end_addres(message: Message, state: FSMContext, bot: Bot):
     if re.match(pattern, input_int):
         await state.update_data(price=input_int)
         data = await state.get_data()
-        data.update({'point_start': 'Магазин'})
+        data.update({'city1_id': 'Магазин'})
         user_id = await get_user(message.from_user.id)
         order_id = await set_order(user_id.id, data)
         message_id = None
         sent_driver_message = await message.answer(f"<b>Ожидайте водителя⌛</b>",
-                                                   reply_markup=await kb.delete_order(order_id, message_id))
+                                                   reply_markup=await kb.delete_order(order_id))
         sent_message = await bot.send_message(chat_id=os.getenv('CHAT_GROUP_ID'),
                                               text=f"Магазин '<b>{user_id.shop_name}</b>' доставка!\n"
-                                                   f"Конечная точка: <b>{data['point_end']}</b>\n\n"
+                                                   f"Конечная точка: <b>{data['address2_id']}</b>\n\n"
                                                    f"Цена: <b>{data['price']}Р</b>",
-                                              reply_markup=await kb.accept(order_id, sent_driver_message.message_id))
+                                              reply_markup=await kb.accept(order_id))
+        await set_chat_id_driver(order_id, sent_driver_message.message_id)
+        await set_chat_id_user(order_id, sent_message.message_id)
 
         await state.clear()
-        await state.update_data(message_id=sent_message.message_id)
+        # await state.update_data(message_id=sent_message.message_id)
     else:
         await message.answer("Пожалуйста, введите только цифры.")
