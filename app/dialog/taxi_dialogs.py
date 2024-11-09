@@ -1,4 +1,5 @@
 import operator
+from operator import itemgetter
 
 from aiogram_dialog import Dialog, DialogManager, Window
 from aiogram_dialog.widgets.input import TextInput
@@ -14,7 +15,7 @@ from aiogram_dialog.widgets.kbd import (
     Start,
     Group,
     SwitchTo,
-    Multiselect
+    Multiselect, PrevPage, NextPage
 )
 from aiogram_dialog.widgets.text import Const, Format, Multi
 from app.dialog.callbacks import (
@@ -49,7 +50,7 @@ from app.dialog.states import StartOrder, AddOrder
 start_menu_order = Dialog(
     Window(
         Format('{text}'),
-        Button(Const('Создать заказ 🏎️'),
+        Button(Const('🚕СОЗДАТЬ ЗАКАЗ🚕'),
                id='start_order',
                on_click=start_order),
         getter=get_role_driver,
@@ -57,7 +58,7 @@ start_menu_order = Dialog(
     ),
     Window(
         Format('{text}'),
-        Button(Const('Создать заказ 🏎️'),
+        Button(Const('🚕СОЗДАТЬ ЗАКАЗ🚕'),
                id='start_order',
                on_click=start_order),
         getter=get_role_user,
@@ -95,16 +96,24 @@ start_menu_dialog = Dialog(
         Const('🅰️: Выберите населенный пункт:'),
         ScrollingGroup(
             Select(
-                text=Format("{item.city_name}"),
+                text=Format("{item[0]}"),
                 id='another1_select',
                 items='another_outside1',
-                item_id_getter=operator.attrgetter('id'),
+                item_id_getter=itemgetter(1),
                 on_click=on_choosen_another1,
             ),
             id='another_group1',
             height=14,
             width=2,
-            hide_pager=False
+            hide_pager=True
+        ),
+        Row(
+            PrevPage(
+                scroll='another_group1', text=Format("◀️"),
+            ),
+            NextPage(
+                scroll='another_group1', text=Format("▶️"),
+            ),
         ),
         SwitchTo(Const('Назад'),
                  state=AddOrder.city1,
@@ -155,16 +164,24 @@ start_menu_dialog = Dialog(
         Const('🅱️: Выберите населенный пункт:'),
         ScrollingGroup(
             Select(
-                text=Format("{item.city_name}"),
+                text=Format("{item[0]}"),
                 id='another2_select',
                 items='another_outside2',
-                item_id_getter=operator.attrgetter('id'),
+                item_id_getter=itemgetter(1),
                 on_click=on_choosen_another2,
             ),
             id='another_group2',
             height=14,
             width=2,
-            hide_pager=False
+            hide_pager=True
+        ),
+        Row(
+            PrevPage(
+                scroll='another_group2', text=Format("◀️"),
+            ),
+            NextPage(
+                scroll='another_group2', text=Format("▶️"),
+            ),
         ),
         SwitchTo(Const('Назад'),
                  state=AddOrder.city2,
@@ -188,12 +205,12 @@ start_menu_dialog = Dialog(
     Window(
         Format("🅰️ Начальная точка: <b>{city1_id} - {address1_id}</b>\n"),
         Format("🅱️ Конечная точка: <b>{city2_id} - {address2_id}</b>\n"),
-        Format("➕ <b>{add_address}\n</b>", when='first_show'),
+        Format("🔃 <b>{add_address}\n</b>", when='first_show'),
         Format("<b>Цена:</b> {price} руб"),
         Row(
             Multiselect(
-                checked_text=Format('[🔘] {item[0]}'),
-                unchecked_text=Format('[ ⚪️ ] {item[0]}'),
+                checked_text=Format('{item[0]}'),
+                unchecked_text=Format('🔃 {item[0]}'),
                 id='multi_topics',
                 item_id_getter=operator.itemgetter(1),
                 items="topics",
@@ -204,7 +221,7 @@ start_menu_dialog = Dialog(
         Cancel(Const('Выйти'),
                id='cancel',
                on_click=cancel_in_start),
-        Button(Const('Заказать'),
+        Button(Const('ЗАКАЗАТЬ'),
                id='order',
                on_click=order_now),
         getter=get_order,
@@ -214,6 +231,7 @@ start_menu_dialog = Dialog(
         Const("<b>Ожидайте водителя⌛</b>\n"),
         Format("🅰️ Начальная точка: <b>{city1_id} - {address1_id}</b>\n"),
         Format("🅱️ Конечная точка: <b>{city2_id} - {address2_id}</b>\n"),
+        Format("🔃 <b>{add_address}\n</b>", when='first_show'),
         Format("<b>Цена:</b> {price} руб"),
         Button(Const('⬆️ Ускорить на 20р'),
                id='upprice',

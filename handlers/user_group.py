@@ -69,21 +69,25 @@ async def accept(callback: CallbackQuery, bot: Bot, state: FSMContext):
 
         message_pass = await bot.send_photo(chat_id=order_id.user_rel.tg_id,
                                             photo=driver.photo_car,
-                                            caption=f'🤝Ваш заказ принят\n'
+                                            caption=f'🤝<b>ВАШ ЗАКАЗ ПРИНЯТ</b>\n'
                                                     f'👤{driver.name} на {driver.car_name}\n'
                                                     f'🚕Номер авто: {driver.number_car}\n'
-                                                    f'📞Телефон: +{driver.phone}\n'
+                                                    f'📞Телефон: {driver.phone}\n'
                                                     f'💰Цена поездки: {order_id.price} руб\n')
 
         # Обновляем состояние, сохраняя идентификатор отправленного сообщения
 
+        text_driver = (f"Заказ <b>{order_id.id}</b>\n\n"
+                        f"Телефон <b>{order_id.user_rel.phone}</b>\n\n"
+                        f"🅰️:<b>{order_id.city1_id} - {order_id.address1_id.upper()}</b>\n\n"
+                        f"🅱️:<b>{order_id.city2_id} - {order_id.address2_id.upper()}</b>\n\n")
+        if order_id.add_address:
+            text_driver += f"🔃<b>{order_id.add_address}</b>\n\n"
+        text_driver += (f"Цена: <b>{order_id.price}Р</b>\n\n"
+                        f'⌚ Выберите время подачи: ⬇️')
+
         message_driver = await bot.send_message(chat_id=callback.from_user.id,
-                                                text=f"Заказ <b>{order_id.id}</b>\n\n"
-                                                     f"Телефон <b>+{order_id.user_rel.phone}</b>\n\n"
-                                                     f"Начальная точка: <b>{order_id.city1_id} - {order_id.address1_id}</b>\n\n"
-                                                     f"Конечная точка: <b>{order_id.city2_id} - {order_id.address2_id}</b>\n\n"
-                                                     f"Цена: <b>{order_id.price}Р</b>\n\n"
-                                                     f'⌚ Выберите время подачи: ⬇️',
+                                                text=text_driver,
                                                 reply_markup=await kb.time_wait(order_id.id))
         # записываем в бд чат
         await set_chat_id_driver(order_id.id, message_pass.message_id)

@@ -163,7 +163,7 @@ async def edit_car(callback: CallbackQuery):
 async def edit_car_1(callback: CallbackQuery, state: FSMContext):
     await callback.answer('')
     driver = await get_one_car(callback.data.split('_')[1])
-    await callback.message.answer_photo(photo=driver.photo_car)
+    # await callback.message.answer_photo(photo=driver.photo_car)
     await callback.message.answer(f"Телефон - {driver.phone}\n"
                                   f"Имя - {driver.name}\n"
                                   f"Название - {driver.car_name}\n"
@@ -498,12 +498,12 @@ async def ban_users(callback: CallbackQuery, state: FSMContext):
 async def ban_users2(callback: CallbackQuery, state: FSMContext):
     await callback.answer('')
     if callback.data == 'ban_add':
-        await callback.message.answer('Введите номер телефона кого нужно забанить в формате 79991115577\n'
-                                      'Без знака плюс', reply_markup=await kb.cancel_order())
+        await callback.message.answer('Введите номер телефона кого нужно забанить в формате +79991115577',
+                                      reply_markup=await kb.cancel_order())
         await state.update_data(banned=True)
     elif callback.data == 'ban_no':
-        await callback.message.answer('Введите номер телефона кого нужно забанить в формате 79991115577\n'
-                                      'Без знака плюс', reply_markup=await kb.cancel_order())
+        await callback.message.answer('Введите номер телефона кого нужно забанить в формате +79991115577',
+                                      reply_markup=await kb.cancel_order())
 
         await state.update_data(banned=False)
     elif callback.data == 'ban_list':
@@ -522,7 +522,7 @@ async def ban_users2(callback: CallbackQuery, state: FSMContext):
 @admin.message(IsAdmin(), BanUser.banned, F.text)
 async def ban_users3(message: Message, state: FSMContext):
     input_int = message.text.strip()
-    pattern = r"^7\d{10}$"
+    pattern = r"^\+7\d{10}$"
     if re.match(pattern, input_int):
         await state.update_data(phone=input_int)
         data = await state.get_data()

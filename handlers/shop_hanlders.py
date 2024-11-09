@@ -33,7 +33,10 @@ async def shop_price(callback: CallbackQuery, state: FSMContext, bot: Bot):
     data = {
         'city1_id': 'Магазин ' + user_id.shop_name,
         'city2_id': 'Магазин ' + user_id.shop_name,
-        'price': price
+        'address1_id': 'доставка',
+        'address2_id': 'доставка',
+
+        'price': int(price)
     }
     order_id = await set_order(user_id.id, data)
     order_data = await get_all_orders(order_id)
@@ -81,9 +84,11 @@ async def shop_point_end_addres(message: Message, state: FSMContext, bot: Bot):
     input_int = message.text.strip()
     pattern = r"^\d+$"
     if re.match(pattern, input_int):
-        await state.update_data(price=input_int)
+        await state.update_data(price=int(input_int))
         data = await state.get_data()
-        data.update({'city1_id': 'Магазин'})
+        data.update({'city1_id': 'Магазин',
+                     'city2_id': 'Магазин',
+                     'address1_id': 'Доставка'})
         user_id = await get_user(message.from_user.id)
         order_id = await set_order(user_id.id, data)
         message_id = None

@@ -28,6 +28,7 @@ async def get_order(order_id):
 
 
 async def get_cities_inside_test(id):
+    id = int(id)
     async with async_session() as sesssion:
         city1 = await sesssion.scalar(select(CityInside).where(CityInside.id == id))
         return city1
@@ -46,6 +47,7 @@ async def get_cities_outside():
 
 
 async def get_cities_inside_id(id):
+    id = int(id)
     async with async_session() as sesssion:
         city1 = await sesssion.scalar(select(CityOutside).where(CityOutside.id == id))
         return city1
@@ -90,6 +92,7 @@ async def get_cities_routes_price_update(city1: str, city2: str, price: int):
 
 
 async def set_order(user_id, data):
+    user_id = int(user_id)
     async with async_session() as session:
         order = Order(**data)
         order.user = user_id
@@ -118,6 +121,7 @@ async def save_free_ride(tg_id, free_ride):
 
 
 async def get_all_orders(id):
+    id = int(id)
     async with async_session() as session:
         # result = await session.scalar(select(Order).where(Order.id == id))
         result = await session.scalar(select(Order)
@@ -168,6 +172,7 @@ async def get_all_car():
 
 
 async def get_one_car(id):
+    id = int(id)
     async with async_session() as session:
         driver = await session.scalar(select(Driver).where(Driver.id == id))
         return driver
@@ -214,6 +219,7 @@ async def delete_order_execution(order_id_id, driver_id_id):
 
 
 async def delete_order_pass(order_id_id):
+    order_id_id = int(order_id_id)
     async with async_session() as session:
         # ---------- удаляем запись о начале выполнения заказа в OnlineExecution
         await session.execute(
@@ -228,6 +234,7 @@ async def delete_order_pass(order_id_id):
 
 
 async def reset_to_zero(driver_id_id):
+    driver_id_id = int(driver_id_id)
     async with async_session() as session:
         # ---------- обнуляем об водителе в  OnlineExecution
         await session.execute(
@@ -277,6 +284,7 @@ async def get_driver_info(driver_id: int) -> dict:
 
 
 async def get_order_driver(order_id):
+    order_id = int(order_id)
     async with async_session() as session:
         # Получаем информацию о водителе
         query_driver = (
@@ -312,12 +320,14 @@ async def up_price_passager(order_id, price_passager):
         return order_instance
 
 async def set_chat_id_user(order_id, chat_id_driverid):
+    chat_id_driverid = str(chat_id_driverid)
     async with async_session() as session:
         query = update(Order).where(Order.id == order_id).values(chat_id_driver=chat_id_driverid)
         await session.execute(query)
         await session.commit()
 
 async def set_chat_id_driver(order_id, chat_id_userid):
+    chat_id_userid = str(chat_id_userid)
     async with async_session() as session:
         query = update(Order).where(Order.id == order_id).values(chat_id_user=chat_id_userid)
         await session.execute(query)

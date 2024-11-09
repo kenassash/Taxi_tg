@@ -7,8 +7,17 @@ from sqlalchemy.ext.asyncio import AsyncAttrs, async_sessionmaker, create_async_
 
 from dotenv import load_dotenv
 
-load_dotenv()
-engine = create_async_engine(url=os.getenv('ENGINE'), echo=False)
+from config_reader import get_config, DbConfig
+
+# load_dotenv()
+# engine = create_async_engine(url=os.getenv('SQLALCHEMY_URL'), echo=True)
+# engine = create_async_engine(url=os.getenv('ENGINE'), echo=True)
+#
+db_config = get_config(DbConfig, "db")
+engine = create_async_engine(
+    url=str(db_config.dsn),  # здесь требуется приведение к строке
+    echo=db_config.is_echo
+)
 
 async_session = async_sessionmaker(engine)
 
@@ -30,7 +39,7 @@ class User(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     tg_id = mapped_column(BigInteger)
-    phone: Mapped[int] = mapped_column(nullable=True)
+    phone: Mapped[str] = mapped_column(String(255), nullable=True)
 
     banned: Mapped[bool] = mapped_column(Boolean, default=False)
     shop_activate: Mapped[bool] = mapped_column(Boolean, default=False)
@@ -69,7 +78,7 @@ class Driver(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     tg_id = mapped_column(BigInteger)
     name: Mapped[str] = mapped_column(String(100), nullable=True)
-    phone: Mapped[int] = mapped_column(nullable=True)
+    phone: Mapped[str] = mapped_column(String(255), nullable=True)
     car_name: Mapped[str] = mapped_column(String(100), nullable=True)
     number_car: Mapped[str] = mapped_column(String(100), nullable=True)
     photo_car: Mapped[str] = mapped_column(String(150), nullable=True)

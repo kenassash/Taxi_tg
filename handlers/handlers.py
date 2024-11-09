@@ -31,13 +31,19 @@ router.message.filter(ChatTypeFilter(['private']))
 
 router.message.middleware(CheckUserBannedMiddleware())
 router.message.middleware(ShopMiddleware())
-router.message.middleware(UserCheckMiddleware())
+# router.message.middleware(UserCheckMiddleware())
 
 load_dotenv()
 
 @router.callback_query(F.data == 'neworder')
 async def on_new_order(callback: CallbackQuery, dialog_manager: DialogManager):
     # Запуск диалога при нажатии на кнопку "neworder"
+    await callback.answer('')
+    user_id = callback.from_user.id
+    user = await get_user(user_id)
+    if not user:
+        await callback.message.answer('Пройдите повторно регистрацию. Нажмите /start')
+        return
     await dialog_manager.start(AddOrder.city1, mode=StartMode.RESET_STACK)
 
 
@@ -62,12 +68,9 @@ async def cmd_start(message: Message,
                     dialog_manager: DialogManager,
                     state: FSMContext):
     # Запуск диалога при нажатии на кнопку "neworder"
-    role = dialog_manager.middleware_data['role']
-    if role == 'driver':
-        # Приветствие таксиста
-        await dialog_manager.start(StartOrder.driver, mode=StartMode.RESET_STACK)
-    elif role == 'user':
-        # Приветсвие пользователя
+    user_id = message.from_user.id
+    user = await get_user(user_id)
+    if user:
         await dialog_manager.start(StartOrder.user, mode=StartMode.RESET_STACK)
     else:
         await message.answer(f'Добро пожаловать в такси городок!\n'
@@ -78,21 +81,22 @@ async def cmd_start(message: Message,
 
 # Обработка полученного номера телефона
 @router.message(StartOrder.request_phone, F.contact)
-async def process_phone(message: Message, state: FSMContext):
+async def process_phone(message: Message, state: FSMContext, dialog_manager: DialogManager):
     # Обработка полученного номера телефона
     phone_number = message.contact.phone_number
+    if not phone_number.startswith("+"):
+        phone_number = "+" + phone_number
     tg_id = message.from_user.id
 
     # Запись пользователя в базу данных
     await set_user(tg_id, phone_number)
-    user = await get_user(tg_id)
 
     # Приветствие пользователя после успешной записи
-    await message.answer(f'Вы зарегестрировались', reply_markup=ReplyKeyboardRemove())
-    await message.answer(f'<b>Добро пожаловать, {message.from_user.full_name}!</b> 😊\n\n'
-                         f'До бесплатной поездки осталось <b>{Settings.free_ride - user.free_ride}</b>',
-                         reply_markup=await kb.main())
+    await message.answer(f'Вы зарегестрировались',
+                         reply_markup=ReplyKeyboardRemove())
     await state.clear()
+    await dialog_manager.start(StartOrder.user, mode=StartMode.RESET_STACK)
+
 @router.message(StartOrder.request_phone)
 async def process_invalid_phone(message: Message):
     # Обработка случая, когда пользователь отправляет что-то, кроме номера телефона
@@ -117,7 +121,7 @@ async def delete_order_passager(callback: CallbackQuery, bot: Bot, state: FSMCon
                                     message_id=message_id_driver,
                                     text=f"<b>Пассажир отменил заказ</b>\n\n"
                                          f"Заказ <b>{driver_id.id}</b>\n\n"
-                                         f"Телефон <b>+{driver_id.user_rel.phone}</b>\n\n"
+                                         f"Телефон <b>{driver_id.user_rel.phone}</b>\n\n"
                                          f"Начальная точка: <b>{driver_id.city1_id} - {driver_id.address1_id}</b>\n\n"
                                          f"Конечная точка: <b>{driver_id.city2_id} - {driver_id.address2_id}</b>\n\n"
                                          f"Цена: <b>{driver_id.price}Р</b>\n\n")
@@ -132,7 +136,7 @@ async def delete_order_passager(callback: CallbackQuery, bot: Bot, state: FSMCon
                                     message_id=message_id_driver,
                                     text=f"<b>Пассажир отменил заказ</b>\n\n"
                                          f"Заказ <b>{driver_id.id}</b>\n\n"
-                                         f"Телефон <b>+{driver_id.user_rel.phone}</b>\n\n"
+                                         f"Телефон <b>{driver_id.user_rel.phone}</b>\n\n"
                                          f"Начальная точка: <b>{driver_id.city1_id} - {driver_id.address1_id}</b>\n\n"
                                          f"Конечная точка: <b>{driver_id.city2_id} - {driver_id.address2_id}</b>\n\n"
                                          f"Цена: <b>{driver_id.price}Р</b>\n\n")
@@ -178,7 +182,7 @@ async def get_manager(message: Message, state: FSMContext, bot: Bot):
                                text=f'CHAT ID: <b>"{message.from_user.id}"</b>\n'
                                     f'Пользователь ник нейм: <b>@{message.from_user.username}</b>\n'
                                     f'Имя: <b>{message.from_user.first_name}</b>\n'
-                                    f'Телефон: <b>+{user.phone}</b>\n'
+                                    f'Телефон: <b>{user.phone}</b>\n'
                                     f'------------------------------\n'
                                     f'Сообщение:\n'
                                     f'<i>{message.text}</i>\n',
@@ -221,6 +225,8 @@ async def add_phone1(message: Message, state: FSMContext):
 @router.message(AddDrivercar.phone, F.contact)
 async def add_name(message: Message, state: FSMContext):
     phone_number = message.contact.phone_number
+    if not phone_number.startswith("+"):
+        phone_number = "+" + phone_number
     await state.update_data(phone=phone_number)
     await state.set_state(AddDrivercar.name)
     await message.answer('Как зовут водителя', reply_markup=await kb.cancel_order())
@@ -276,14 +282,14 @@ async def add_item_category(message: Message, state: FSMContext, bot: Bot):
 
     # await message.answer_photo(photo=data['photo_car'], caption=f"Телефон {data['phone']}")
     chat_admin = os.environ.get('CHAT_ID_ADMIN')
-    await message.answer('Машина отправлена на рассмотрение')
+    await message.answer('Машина отправлена на рассмотрение', reply_markup=ReplyKeyboardRemove())
     await bot.send_photo(chat_id=chat_admin,
                          photo=data['photo_car'],
                          caption=f'Ргеистрация автомобиля\n\n'
                                  f'Телефон:<b> {data["phone"]}</b>\n\n'
                                  f'Имя:<b> {data["name"]}</b>\n\n'
                                  f'Название машины: <b>{data["car_name"]}</b>\n\n'
-                                 f'Номер машины: <b>{data["number_car"]}Р</b>',
+                                 f'Номер машины: <b>{data["number_car"]}</b>',
                          reply_markup=await kb.add_car_or_no(driver_id))
     await state.clear()
 
@@ -309,7 +315,7 @@ async def add_shop(message: Message, state: FSMContext):
         data = await state.update_data(shop_name=message.text)
         user_id = message.from_user.id
         await shop_add(user_id, shop_activate=True, shop_name=data['shop_name'])
-        await message.answer('Магазин успешно добавлен')
+        await message.answer('Магазин успешно добавлен', reply_markup=ReplyKeyboardRemove())
         await state.clear()
     else:
         await message.answer('Введите корретно название магазина')

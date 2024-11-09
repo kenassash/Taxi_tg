@@ -3,6 +3,7 @@ from aiogram import Router, F, Bot
 from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery
 from dotenv import load_dotenv
+from datetime import datetime, timedelta
 
 from app.database.requests import get_all_orders, get_driver, delete_order_execution, delete_order_pass, \
     get_order_driver, save_free_ride, set_chat_id_driver, set_chat_id_user
@@ -30,14 +31,17 @@ async def close(callback: CallbackQuery, bot: Bot):
 
         await bot.delete_message(chat_id=order_id.user_rel.tg_id, message_id=message_id)
         message_id_pass = await bot.send_message(chat_id=order_id.user_rel.tg_id,
-                                                 text=f'Ожидайте ⌛\n'
+                                                 text=f'<b>Ожидайте ⌛</b>\n'
                                                       f'Будет назначен новый водитель в ближайшее время\n')
+        text_order = (f'Водитель {driver_id.name} отменил выпонлнение заказа\n'
+                     f"Телефон <b>{order_id.user_rel.phone}</b>\n\n"
+                     f"🅰️:<b>{order_id.city1_id} - {order_id.address1_id.upper()}</b>\n\n"
+                     f"🅱️:<b>{order_id.city2_id} - {order_id.address2_id.upper()}</b>\n\n")
+        if order_id.add_address:
+            text_order += f"🔃<b>{order_id.add_address}</b>\n\n"
+        text_order += f"Цена: <b>{order_id.price}Р</b>"
         message_driver = await bot.send_message(chat_id=os.getenv('CHAT_GROUP_ID'),
-                                                text=f'Водитель {driver_id.name} отменил выпонлнение заказа\n'
-                                                     f"Телефон <b>+{order_id.user_rel.phone}</b>\n\n"
-                                                     f"Начальная точка: <b>{order_id.city1_id} - {order_id.address1_id}</b>\n\n"
-                                                     f"Конечная точка: <b>{order_id.city2_id} - {order_id.address2_id}</b>\n\n"
-                                                     f"Цена: <b>{order_id.price}Р</b>\n\n",
+                                                text=text_order,
                                                 reply_markup=await kb.accept(order_id.id))
 
         await callback.message.edit_text(f'Вы отказались от заказа <b>№{order_id.id}</b>')
@@ -66,21 +70,27 @@ async def timewait(callback: CallbackQuery, bot: Bot):
         time_wait = callback.data.split('_')[2]
         # message_id = callback.data.split('_')[3]
         message_id = order_id.chat_id_user
+        arrival_time = datetime.now() + timedelta(minutes=float(time_wait))
+        formatted_arrival_time = arrival_time.strftime("%H:%M")
 
         await bot.delete_message(chat_id=order_id.user_rel.tg_id, message_id=message_id)
 
         message_pass = await bot.send_photo(chat_id=order_id.user_rel.tg_id,
                                             photo=driver.photo_car,
-                                            caption=f'⏳Время прибытия {time_wait} мин\n'
+                                            caption=f'<b>⏳ВРЕМЯ ПРИБЫТИЯ {time_wait} мин</b>\n'
                                                     f'👤{driver.name} на {driver.car_name}\n'
                                                     f'🚕Номер авто: {driver.number_car}\n'
-                                                    f'📞Телефон: +{driver.phone}\n'
+                                                    f'📞Телефон: {driver.phone}\n'
                                                     f'💰Цена поездки: {order_id.price} руб')
-        message_driver = await callback.message.edit_text(f"Заказ <b>{order_id.id}</b>\n\n"
-                                                          f"Телефон <b>+{order_id.user_rel.phone}</b>\n\n"
-                                                     f"Начальная точка: <b>{order_id.city1_id} - {order_id.address1_id}</b>\n\n"
-                                                     f"Конечная точка: <b>{order_id.city2_id} - {order_id.address2_id}</b>\n\n"
-                                                          f"Цена: <b>{order_id.price}Р</b>\n\n",
+        text_driver = (f"Заказ <b>{order_id.id}</b>\n\n"
+                        f"⏳Время прибытия <b>{formatted_arrival_time} мин</b>\n\n"
+                        f"Телефон <b>{order_id.user_rel.phone}</b>\n\n"
+                        f"🅰️:<b>{order_id.city1_id} - {order_id.address1_id.upper()}</b>\n\n"
+                        f"🅱️:<b>{order_id.city2_id} - {order_id.address2_id.upper()}</b>\n\n")
+        if order_id.add_address:
+            text_driver += f"🔃<b>{order_id.add_address}</b>\n\n"
+        text_driver += f"Цена: <b>{order_id.price}Р</b>"
+        message_driver = await callback.message.edit_text(text=text_driver,
                                                           reply_markup=await kb.on_the_spot_kb(order_id.id,
                                                                                                message_pass.message_id))
         # reply_markup = await kb.close_and_finish(order_id.id)
@@ -109,16 +119,19 @@ async def on_the_spot(callback: CallbackQuery, bot: Bot):
 
         message_pass = await bot.send_photo(chat_id=order_id.user_rel.tg_id,
                                             photo=driver.photo_car,
-                                            caption=f'🎯Водитель приехал🎯\n'
+                                            caption=f'<b>🎯ВОДИТЕЛЬ ПРИЕХАЛ🎯</b>\n'
                                                     f'👤{driver.name} на {driver.car_name}\n'
                                                     f'🚕Номер авто: {driver.number_car}\n'
-                                                    f'📞Телефон: +{driver.phone}\n'
+                                                    f'📞Телефон: {driver.phone}\n'
                                                     f'💰Цена поездки: {order_id.price} руб')
-        message_driver = await callback.message.edit_text(f"Заказ <b>{order_id.id}</b>\n\n"
-                                                          f"Телефон <b>+{order_id.user_rel.phone}</b>\n\n"
-                                                     f"Начальная точка: <b>{order_id.city1_id} - {order_id.address1_id}</b>\n\n"
-                                                     f"Конечная точка: <b>{order_id.city2_id} - {order_id.address2_id}</b>\n\n"
-                                                          f"Цена: <b>{order_id.price}Р</b>\n\n",
+        text_driver = (f"Заказ <b>{order_id.id}</b>\n\n"
+                       f"Телефон <b>{order_id.user_rel.phone}</b>\n\n"
+                       f"🅰️:<b>{order_id.city1_id} - {order_id.address1_id.upper()}</b>\n\n"
+                       f"🅱️:<b>{order_id.city2_id} - {order_id.address2_id.upper()}</b>\n\n")
+        if order_id.add_address:
+            text_driver += f"🔃<b>{order_id.add_address}</b>\n\n"
+        text_driver += f"Цена: <b>{order_id.price}Р</b>"
+        message_driver = await callback.message.edit_text(text=text_driver,
                                                           reply_markup=await kb.close_and_finish(order_id.id,
                                                                                                  message_pass.message_id))
         await set_chat_id_driver(order_id.id, message_pass.message_id)
@@ -155,23 +168,29 @@ async def finish(callback: CallbackQuery, bot: Bot):
         # Удаляем запись запись о начале выполнения заказа
         # await delete_order_execution(order_id.id, driver_id.id)
         # Увеличиваем счетчик поездок
-        user_free_ride = order_id.user_rel.free_ride
-        user_free_ride += 1
-        if user_free_ride == Settings.free_ride:
-            free_ride_count = 0  # Обнуляем счетчик после 10-й поездки
-            await save_free_ride(order_id.user_rel.tg_id, free_ride_count)
-            await bot.send_message(chat_id=order_id.user_rel.tg_id,
-                                   text=f'Поздравляем! Ваша следующая поездка будет бесплатной! 🎉',
-                                   reply_markup=await kb.main())
-        else:
-            free_ride = user_free_ride
-            await save_free_ride(order_id.user_rel.tg_id, free_ride)
-            await bot.delete_message(chat_id=order_id.user_rel.tg_id, message_id=message_id_pass)
-            await bot.send_message(chat_id=order_id.user_rel.tg_id,
-                                   text=f'Заказ выполнен✅.\n'
-                                        f'Спасибо что пользуетесь нашими услугами 🙏\n\n'
-                                        f'До бесплатной поездки осталось {Settings.free_ride - free_ride}',
-                                   reply_markup=await kb.main())
+        #Бесплатные поездки
+        # user_free_ride = order_id.user_rel.free_ride
+        # user_free_ride += 1
+        # if user_free_ride == Settings.free_ride:
+        #     free_ride_count = 0  # Обнуляем счетчик после 10-й поездки
+        #     await save_free_ride(order_id.user_rel.tg_id, free_ride_count)
+        #     await bot.send_message(chat_id=order_id.user_rel.tg_id,
+        #                            text=f'Поздравляем! Ваша следующая поездка будет бесплатной! 🎉',
+        #                            reply_markup=await kb.main())
+        # else:
+        #     free_ride = user_free_ride
+        #     await save_free_ride(order_id.user_rel.tg_id, free_ride)
+        #     await bot.delete_message(chat_id=order_id.user_rel.tg_id, message_id=message_id_pass)
+        #     await bot.send_message(chat_id=order_id.user_rel.tg_id,
+        #                            text=f'Заказ выполнен✅.\n'
+        #                                 f'Спасибо что пользуетесь нашими услугами 🙏\n\n'
+        #                                 f'До бесплатной поездки осталось {Settings.free_ride - free_ride}',
+        #                            reply_markup=await kb.main())
+        await bot.delete_message(chat_id=order_id.user_rel.tg_id, message_id=message_id_pass)
+        await bot.send_message(chat_id=order_id.user_rel.tg_id,
+                               text=f'Заказ выполнен✅.\n'
+                                    f'Спасибо что пользуетесь нашими услугами 🙏\n\n',
+                               reply_markup=await kb.main())
 
         await callback.message.delete()
     except AttributeError:
