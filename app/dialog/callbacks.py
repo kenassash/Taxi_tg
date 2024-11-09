@@ -160,10 +160,10 @@ async def order_now(callback: CallbackQuery,
     result = next((name for name, key in topics if key in selected_items), None)
 
     order_data = await get_all_orders(order_id)
-    text_order = (f"Заказ <b>{order_id}</b>\n\n"
-                 f"Телефон <b>{user_id.phone}</b>\n\n"
-                 f"🅰️:<b>{order_data.city1_id} - {order_data.address1_id.upper()}</b>\n\n"
-                 f"🅱️:<b>{order_data.city2_id} - {order_data.address2_id.upper()}</b>\n\n")
+    text_order = (f"🔥Заказ <b>{order_id}</b>🔥\n\n"
+                 f"📞Телефон <b>{user_id.phone}</b>\n\n"
+                 f"📍:<b>{order_data.city1_id} - {order_data.address1_id.upper()}</b>\n\n"
+                 f"️📍:<b>{order_data.city2_id} - {order_data.address2_id.upper()}</b>\n\n")
     if order_data.add_address:
         text_order += f"🔃<b>{order_data.add_address}</b>\n\n"
     text_order += f"Цена: <b>{order_data.price}Р</b>"
@@ -189,10 +189,10 @@ async def upprice_order(callback: CallbackQuery,
     order_id_id = dialog_manager.dialog_data.get('order_id')
     price = 20
     order_id = await up_price_passager(order_id_id, price)
-    text_order = (f"Заказ <b>{order_id.id}</b>\n\n"
-                 f"Телефон <b>{order_id.user_rel.phone}</b>\n\n"
-                 f"🅰️:<b>{order_id.city1_id} - {order_id.address1_id.upper()}</b>\n\n"
-                 f"🅱️:<b>{order_id.city2_id} - {order_id.address2_id.upper()}</b>\n\n")
+    text_order = (f"🔥Заказ <b>{order_id.id}</b>🔥\n\n"
+                 f"📞Телефон <b>{order_id.user_rel.phone}</b>\n\n"
+                 f"📍:<b>{order_id.city1_id} - {order_id.address1_id.upper()}</b>\n\n"
+                 f"📍:<b>{order_id.city2_id} - {order_id.address2_id.upper()}</b>\n\n")
     if order_id.add_address:
         text_order += f"🔃<b>{order_id.add_address}</b>\n\n"
     text_order += f"Цена: <b>{order_id.price}Р</b>"

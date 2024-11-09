@@ -1,5 +1,6 @@
 import os
 from aiogram import Router, F
+from aiogram.exceptions import TelegramBadRequest
 from aiogram.filters import CommandStart
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import StatesGroup, State
@@ -63,9 +64,16 @@ async def accept(callback: CallbackQuery, bot: Bot, state: FSMContext):
         #     return
 
         # Создаем запись о начале выполнения заказа
-        await start_order_execution(order_id.id, driver.id)
+        try:
+            await start_order_execution(order_id.id, driver.id)
         # удаляю сообщение у пользователя
-        await bot.delete_message(chat_id=order_id.user_rel.tg_id, message_id=message_id_pass)
+            await bot.delete_message(chat_id=order_id.user_rel.tg_id, message_id=message_id_pass)
+        except TelegramBadRequest as e:
+            if "message to delete not found" in str(e):
+                # Логирование или обработка конкретного случая, если сообщение не найдено
+                print("Сообщение уже удалено или не найдено.")
+            else:
+                raise e
 
         message_pass = await bot.send_photo(chat_id=order_id.user_rel.tg_id,
                                             photo=driver.photo_car,

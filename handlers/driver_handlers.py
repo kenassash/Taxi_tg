@@ -1,5 +1,6 @@
 import os
 from aiogram import Router, F, Bot
+from aiogram.exceptions import TelegramBadRequest
 from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery
 from dotenv import load_dotenv
@@ -28,15 +29,22 @@ async def close(callback: CallbackQuery, bot: Bot):
 
         # Удаляем запись запись о начале выполнения заказа
         await delete_order_execution(order_id.id, driver_id.id)
-
-        await bot.delete_message(chat_id=order_id.user_rel.tg_id, message_id=message_id)
+        try:
+            # удаляю сообщение у пользователя
+            await bot.delete_message(chat_id=order_id.user_rel.tg_id, message_id=message_id)
+        except TelegramBadRequest as e:
+            if "message to delete not found" in str(e):
+                # Логирование или обработка конкретного случая, если сообщение не найдено
+                print("Сообщение уже удалено или не найдено.")
+            else:
+                raise e
         message_id_pass = await bot.send_message(chat_id=order_id.user_rel.tg_id,
                                                  text=f'<b>Ожидайте ⌛</b>\n'
                                                       f'Будет назначен новый водитель в ближайшее время\n')
         text_order = (f'Водитель {driver_id.name} отменил выпонлнение заказа\n'
-                     f"Телефон <b>{order_id.user_rel.phone}</b>\n\n"
-                     f"🅰️:<b>{order_id.city1_id} - {order_id.address1_id.upper()}</b>\n\n"
-                     f"🅱️:<b>{order_id.city2_id} - {order_id.address2_id.upper()}</b>\n\n")
+                     f"📞Телефон <b>{order_id.user_rel.phone}</b>\n\n"
+                     f"📍:<b>{order_id.city1_id} - {order_id.address1_id.upper()}</b>\n\n"
+                     f"📍:<b>{order_id.city2_id} - {order_id.address2_id.upper()}</b>\n\n")
         if order_id.add_address:
             text_order += f"🔃<b>{order_id.add_address}</b>\n\n"
         text_order += f"Цена: <b>{order_id.price}Р</b>"
@@ -72,8 +80,15 @@ async def timewait(callback: CallbackQuery, bot: Bot):
         message_id = order_id.chat_id_user
         arrival_time = datetime.now() + timedelta(minutes=float(time_wait))
         formatted_arrival_time = arrival_time.strftime("%H:%M")
-
-        await bot.delete_message(chat_id=order_id.user_rel.tg_id, message_id=message_id)
+        try:
+            # удаляю сообщение у пользователя
+            await bot.delete_message(chat_id=order_id.user_rel.tg_id, message_id=message_id)
+        except TelegramBadRequest as e:
+            if "message to delete not found" in str(e):
+                # Логирование или обработка конкретного случая, если сообщение не найдено
+                print("Сообщение уже удалено или не найдено.")
+            else:
+                raise e
 
         message_pass = await bot.send_photo(chat_id=order_id.user_rel.tg_id,
                                             photo=driver.photo_car,
@@ -82,11 +97,11 @@ async def timewait(callback: CallbackQuery, bot: Bot):
                                                     f'🚕Номер авто: {driver.number_car}\n'
                                                     f'📞Телефон: {driver.phone}\n'
                                                     f'💰Цена поездки: {order_id.price} руб')
-        text_driver = (f"Заказ <b>{order_id.id}</b>\n\n"
+        text_driver = (f"🔥Заказ <b>{order_id.id}</b>🔥\n\n"
                         f"⏳Время прибытия <b>{formatted_arrival_time} мин</b>\n\n"
-                        f"Телефон <b>{order_id.user_rel.phone}</b>\n\n"
-                        f"🅰️:<b>{order_id.city1_id} - {order_id.address1_id.upper()}</b>\n\n"
-                        f"🅱️:<b>{order_id.city2_id} - {order_id.address2_id.upper()}</b>\n\n")
+                        f"📞Телефон <b>{order_id.user_rel.phone}</b>\n\n"
+                        f"📍:<b>{order_id.city1_id} - {order_id.address1_id.upper()}</b>\n\n"
+                        f"📍:<b>{order_id.city2_id} - {order_id.address2_id.upper()}</b>\n\n")
         if order_id.add_address:
             text_driver += f"🔃<b>{order_id.add_address}</b>\n\n"
         text_driver += f"Цена: <b>{order_id.price}Р</b>"
@@ -114,8 +129,15 @@ async def on_the_spot(callback: CallbackQuery, bot: Bot):
         driver = await get_driver(callback.from_user.id)
         # message_id = callback.data.split('_')[2]
         message_id = order_id.chat_id_user
-
-        await bot.delete_message(chat_id=order_id.user_rel.tg_id, message_id=message_id)
+        try:
+        # удаляю сообщение у пользователя
+            await bot.delete_message(chat_id=order_id.user_rel.tg_id, message_id=message_id)
+        except TelegramBadRequest as e:
+            if "message to delete not found" in str(e):
+                # Логирование или обработка конкретного случая, если сообщение не найдено
+                print("Сообщение уже удалено или не найдено.")
+            else:
+                raise e
 
         message_pass = await bot.send_photo(chat_id=order_id.user_rel.tg_id,
                                             photo=driver.photo_car,
@@ -124,10 +146,10 @@ async def on_the_spot(callback: CallbackQuery, bot: Bot):
                                                     f'🚕Номер авто: {driver.number_car}\n'
                                                     f'📞Телефон: {driver.phone}\n'
                                                     f'💰Цена поездки: {order_id.price} руб')
-        text_driver = (f"Заказ <b>{order_id.id}</b>\n\n"
-                       f"Телефон <b>{order_id.user_rel.phone}</b>\n\n"
-                       f"🅰️:<b>{order_id.city1_id} - {order_id.address1_id.upper()}</b>\n\n"
-                       f"🅱️:<b>{order_id.city2_id} - {order_id.address2_id.upper()}</b>\n\n")
+        text_driver = (f"🔥Заказ <b>{order_id.id}</b>🔥\n\n"
+                       f"📞Телефон <b>{order_id.user_rel.phone}</b>\n\n"
+                       f"📍:<b>{order_id.city1_id} - {order_id.address1_id.upper()}</b>\n\n"
+                       f"📍:<b>{order_id.city2_id} - {order_id.address2_id.upper()}</b>\n\n")
         if order_id.add_address:
             text_driver += f"🔃<b>{order_id.add_address}</b>\n\n"
         text_driver += f"Цена: <b>{order_id.price}Р</b>"
@@ -160,7 +182,15 @@ async def finish(callback: CallbackQuery, bot: Bot):
         text = data.split(' ')[0]
         if text == 'Магазин':
             await callback.message.delete()
-            await bot.delete_message(chat_id=order_id.user_rel.tg_id, message_id=message_id_pass)
+            try:
+                # удаляю сообщение у пользователя
+                await bot.delete_message(chat_id=order_id.user_rel.tg_id, message_id=message_id_pass)
+            except TelegramBadRequest as e:
+                if "message to delete not found" in str(e):
+                    # Логирование или обработка конкретного случая, если сообщение не найдено
+                    print("Сообщение уже удалено или не найдено.")
+                else:
+                    raise e
             await bot.send_message(chat_id=order_id.user_rel.tg_id,
                                    text=f'Заказ выполнен✅.\n',
                                    reply_markup=await kb_sh.shop_order())
@@ -186,7 +216,15 @@ async def finish(callback: CallbackQuery, bot: Bot):
         #                                 f'Спасибо что пользуетесь нашими услугами 🙏\n\n'
         #                                 f'До бесплатной поездки осталось {Settings.free_ride - free_ride}',
         #                            reply_markup=await kb.main())
-        await bot.delete_message(chat_id=order_id.user_rel.tg_id, message_id=message_id_pass)
+        try:
+            # удаляю сообщение у пользователя
+            await bot.delete_message(chat_id=order_id.user_rel.tg_id, message_id=message_id_pass)
+        except TelegramBadRequest as e:
+            if "message to delete not found" in str(e):
+                # Логирование или обработка конкретного случая, если сообщение не найдено
+                print("Сообщение уже удалено или не найдено.")
+            else:
+                raise e
         await bot.send_message(chat_id=order_id.user_rel.tg_id,
                                text=f'Заказ выполнен✅.\n'
                                     f'Спасибо что пользуетесь нашими услугами 🙏\n\n',
