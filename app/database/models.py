@@ -4,6 +4,7 @@ from typing import List
 from sqlalchemy import BigInteger, ForeignKey, String, DateTime, func, Boolean
 from sqlalchemy.orm import Mapped, mapped_column, relationship, DeclarativeBase
 from sqlalchemy.ext.asyncio import AsyncAttrs, async_sessionmaker, create_async_engine
+from app.database import Base
 
 from dotenv import load_dotenv
 
@@ -22,9 +23,7 @@ engine = create_async_engine(
 async_session = async_sessionmaker(engine)
 
 
-class Base(AsyncAttrs, DeclarativeBase):
-    created: Mapped[DateTime] = mapped_column(DateTime, default=func.now())
-    updated: Mapped[DateTime] = mapped_column(DateTime, default=func.now(), onupdate=func.now())
+
 
 
 """
@@ -60,6 +59,12 @@ class Order(Base):
 
     address1_id: Mapped[str] = mapped_column(String(200), nullable=True)
     address2_id: Mapped[str] = mapped_column(String(200), nullable=True)
+
+    add_new_address1: Mapped[str] = mapped_column(String(200), nullable=True)
+    add_new_address2: Mapped[str] = mapped_column(String(200), nullable=True)
+
+    add_street_address1: Mapped[str] = mapped_column(String(200), nullable=True)
+    add_street_address2: Mapped[str] = mapped_column(String(200), nullable=True)
 
     add_address: Mapped[str] = mapped_column(String(200), nullable=True)
     price: Mapped[int] = mapped_column(nullable=True)
@@ -112,7 +117,6 @@ class CityRoutes(Base):
     city1: Mapped[str] = mapped_column(String(255), nullable=True)
     city2: Mapped[str] = mapped_column(String(255), nullable=True)
     price: Mapped[int] = mapped_column(nullable=True)
-
 
 class OnlineExecution(Base):
     __tablename__ = 'order_executions'

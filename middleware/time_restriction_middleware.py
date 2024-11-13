@@ -2,7 +2,7 @@ import asyncio
 import os
 from typing import Any, Callable, Dict, Awaitable
 from aiogram import BaseMiddleware
-from aiogram.types import TelegramObject, Message, Update
+from aiogram.types import TelegramObject, Message, Update, CallbackQuery
 from datetime import datetime, time
 import pytz
 
@@ -24,11 +24,22 @@ class TimeRestrictionMiddleware(BaseMiddleware):
             event: TelegramObject,
             data: Dict[str, Any],
     ) -> Any:
+
         if not self.active:
             return await handler(event, data)
-        else:
+            # Обработка блокировки для сообщений
+
+        # Если событие — Message
+        elif isinstance(event, Message):
             await event.answer("Извините, но отправка сообщений временно недоступна")
             return
+
+        # Если событие — CallbackQuery
+        elif isinstance(event, CallbackQuery):
+            await event.answer("Извините, эта функция временно недоступна", show_alert=True)
+            return
+
+        return await handler(event, data)
 
         # # Получение текущего времени в заданном часовом поясе
         # current_time = datetime.now(self.timezone).time()

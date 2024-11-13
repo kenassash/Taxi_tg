@@ -12,15 +12,21 @@ from app.change_price import Settings
 from app.database.requests import add_car, get_all_car, remove_car, print_all_online_executions, \
     get_all_drivers_with_update_date, get_users, get_one_car, get_driver_info, reset_to_zero, update_car, \
     get_users_count, add_change_price, ban_user, get_ban_all_user, get_cities_routes_price, \
-    get_cities_routes_price_update, no_active, get_all_orders
+    get_cities_routes_price_update, no_active, get_all_orders, city_routers_update_all
 
 import app.keyboards as kb
 import app.kb.kb_admin as kb_admin
+from app.dialog import start_menu_dialog, start_menu_order
 from filters.chat_type import ChatTypeFilter, IsAdmin
 from handlers.handlers import router
 from middleware.time_restriction_middleware import TimeRestrictionMiddleware
 
-time_restriction_middleware_instance = router.message.middleware(TimeRestrictionMiddleware())
+time_restriction_middleware_instance = TimeRestrictionMiddleware()
+
+router.message.middleware(time_restriction_middleware_instance)
+start_menu_dialog.callback_query.middleware(time_restriction_middleware_instance)
+start_menu_order.callback_query.middleware(time_restriction_middleware_instance)
+
 
 admin = Router()
 admin.message.filter(ChatTypeFilter(["private"]), IsAdmin())
@@ -273,6 +279,7 @@ async def newsletter_message(message: Message, state: FSMContext):
 class ChangeMoney(StatesGroup):
     price = State()
     change_price = State()
+    change_price_city_routers = State()
 
 
 @admin.callback_query(IsAdmin(), F.data == 'change_settings')
@@ -282,13 +289,15 @@ async def change_settings_callback1(callback: CallbackQuery, state: FSMContext):
                                      reply_markup=await kb_admin.change_money())
 
 
-@admin.callback_query(IsAdmin(), or_f(F.data == 'changeinside', F.data == 'changeoutside', \
+@admin.callback_query(IsAdmin(), or_f(F.data == 'changerouters', F.data == 'changeoutside', \
                                       F.data == 'change_point_start_end'))
 async def change_settings_callback2(callback: CallbackQuery, state: FSMContext):
     await callback.answer('')
-    if callback.data == 'changeinside':
-        await callback.message.answer('Выберите где нужно поменять тариф 💵',
-                                      reply_markup=await kb_admin.change_mouney_inside())
+    if callback.data == 'changerouters':
+        await callback.message.answer('Ведите сумму со знаком + или -\nНапример: +30 или -20',
+                                      reply_markup=await kb.cancel_order())
+        await state.set_state(ChangeMoney.change_price_city_routers)
+
     elif callback.data == 'changeoutside':
         await callback.message.answer('Выберите где нужно поменять тариф 💵',
                                       reply_markup=await kb_admin.change_mouney_outside())
@@ -300,6 +309,20 @@ async def change_settings_callback2(callback: CallbackQuery, state: FSMContext):
         await callback.message.answer('Выберите первую точку',
                                       reply_markup=await kb_admin.change_mouney_routes1())
 
+
+# ---Изменить ценну в связке целиком во всех точках----
+@admin.message(IsAdmin(), ChangeMoney.change_price_city_routers, F.text)
+async def change_city_routers_all(message: Message, state: FSMContext):
+    input_int = message.text.strip()
+    pattern = r"^[+-]\d+$"
+    if re.match(pattern, input_int):
+        await state.update_data(price=message.text)
+        data = await state.get_data()
+        await city_routers_update_all(data['price'])
+        await message.answer(f'Цена успешна обновлена во всех связках')
+        await state.clear()
+    else:
+        await message.answer("Пожалуйста, введите цифры со знаком + или -")
 
 # ---Изменить ценну в связке----
 @admin.callback_query(IsAdmin(), F.data.startswith('chroute_'))

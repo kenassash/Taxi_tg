@@ -9,7 +9,6 @@ from aiogram import Bot
 
 from aiogram_dialog import Dialog, DialogManager, Window, StartMode, ShowMode
 
-
 from dotenv import load_dotenv
 
 import app.keyboards as kb
@@ -34,6 +33,7 @@ router.message.middleware(ShopMiddleware())
 # router.message.middleware(UserCheckMiddleware())
 
 load_dotenv()
+
 
 @router.callback_query(F.data == 'neworder')
 async def on_new_order(callback: CallbackQuery, dialog_manager: DialogManager):
@@ -62,6 +62,7 @@ async def cancelorder(callback: CallbackQuery, state: FSMContext):
     await callback.message.delete()
 
     await callback.message.answer(f'Вы отменили')
+
 
 @router.message(CommandStart())
 async def cmd_start(message: Message,
@@ -97,11 +98,11 @@ async def process_phone(message: Message, state: FSMContext, dialog_manager: Dia
     await state.clear()
     await dialog_manager.start(StartOrder.user, mode=StartMode.RESET_STACK)
 
+
 @router.message(StartOrder.request_phone)
 async def process_invalid_phone(message: Message):
     # Обработка случая, когда пользователь отправляет что-то, кроме номера телефона
     await message.answer('Пожалуйста, используйте кнопку для отправки телефона')
-
 
 
 # ---- отменить заказ----
@@ -119,12 +120,9 @@ async def delete_order_passager(callback: CallbackQuery, bot: Bot, state: FSMCon
         # message_id_driver = callback.data.split('_')[2]
         await bot.edit_message_text(chat_id=driver.tg_id,
                                     message_id=message_id_driver,
-                                    text=f"<b>Пассажир отменил заказ</b>\n\n"
-                                         f"Заказ <b>{driver_id.id}</b>\n\n"
-                                         f"Телефон <b>{driver_id.user_rel.phone}</b>\n\n"
-                                         f"Начальная точка: <b>{driver_id.city1_id} - {driver_id.address1_id}</b>\n\n"
-                                         f"Конечная точка: <b>{driver_id.city2_id} - {driver_id.address2_id}</b>\n\n"
-                                         f"Цена: <b>{driver_id.price}Р</b>\n\n")
+                                    text=f"Заказ <code>{driver_id.id}</code>\n"
+                                         f"<b>❌Пассажир отменил заказ</b>\n\n"
+                                         f"Телефон <b>{driver_id.user_rel.phone}</b>")
         await callback.message.delete()
         await callback.message.answer(f'Заказ отменен')
 
@@ -134,12 +132,9 @@ async def delete_order_passager(callback: CallbackQuery, bot: Bot, state: FSMCon
     else:
         await bot.edit_message_text(chat_id=os.getenv('CHAT_GROUP_ID'),
                                     message_id=message_id_driver,
-                                    text=f"<b>Пассажир отменил заказ</b>\n\n"
-                                         f"Заказ <b>{driver_id.id}</b>\n\n"
-                                         f"Телефон <b>{driver_id.user_rel.phone}</b>\n\n"
-                                         f"Начальная точка: <b>{driver_id.city1_id} - {driver_id.address1_id}</b>\n\n"
-                                         f"Конечная точка: <b>{driver_id.city2_id} - {driver_id.address2_id}</b>\n\n"
-                                         f"Цена: <b>{driver_id.price}Р</b>\n\n")
+                                    text=f"Заказ <code>{driver_id.id}</code>\n"
+                                         f"<b>❌Пассажир отменил заказ</b>\n\n"
+                                         f"Телефон <b>{driver_id.user_rel.phone}</b>")
         await callback.message.delete()
         await callback.message.answer(f'Заказ отменен')
         await state.clear()

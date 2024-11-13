@@ -33,7 +33,8 @@ from app.dialog.callbacks import (
     commit,
     order_now,
     upprice_order,
-    cancel_upprice
+    cancel_upprice, add_new_address_cb, on_choosen_add_address_cb, order_now_with_new_address1,
+    add_new_address1, add_new_address2, add_new_address_cb2, on_choosen_add_address_cb2, order_now_with_new_address2
 )
 from app.dialog.getters import (
     get_role_driver,
@@ -43,7 +44,8 @@ from app.dialog.getters import (
     get_city_inside2,
     getter_another_outside2,
     get_order,
-    get_upprice
+    get_upprice, add_new_address_getter, get_order_with_new_address1, add_new_address_getter2,
+    get_order_with_new_address2
 )
 from app.dialog.states import StartOrder, AddOrder
 
@@ -69,7 +71,7 @@ start_menu_order = Dialog(
 # Определение диалога
 start_menu_dialog = Dialog(
     Window(
-        Const('<b>🅰️: Выберите откуда поедете:</b>'),
+        Const('<b>📍: Выберите откуда поедете:</b>'),
         Group(
             Select(
                 Format('{item.city_name}'),
@@ -93,7 +95,7 @@ start_menu_dialog = Dialog(
         state=AddOrder.city1,
     ),
     Window(
-        Const('🅰️: Выберите населенный пункт:'),
+        Const('📍: Выберите населенный пункт:'),
         ScrollingGroup(
             Select(
                 text=Format("{item[0]}"),
@@ -123,7 +125,7 @@ start_menu_dialog = Dialog(
         state=AddOrder.another1,
     ),
     Window(
-        Const('<b>🅰️: Напишите  Улицу и № дома\nНапример: Южная 8</b>'),
+        Const('<b>Напишите  улицу и № дома откуда поедите\nНапример: Южная 8</b>'),
         TextInput(
             id='addres1_input',
             type_factory=str,
@@ -136,8 +138,8 @@ start_menu_dialog = Dialog(
         state=AddOrder.address1,
     ),
     Window(
-        Format("<b>🅰️: {city1_id} - {address1_id}</b>\n"),
-        Format("<b>🅱️: Выберите куда поедете:</b>"),
+        Format("<b>📍: {city1_id} - {address1_id}</b>\n"),
+        Format("<b>📍: Выберите куда поедете:</b>"),
 
         Group(
             Select(
@@ -161,7 +163,7 @@ start_menu_dialog = Dialog(
         state=AddOrder.city2
     ),
     Window(
-        Const('🅱️: Выберите населенный пункт:'),
+        Const('📍: Выберите населенный пункт:'),
         ScrollingGroup(
             Select(
                 text=Format("{item[0]}"),
@@ -191,7 +193,7 @@ start_menu_dialog = Dialog(
         state=AddOrder.another2,
     ),
     Window(
-        Const('<b>🅱️: Напишите  Улицу и № дома\nНапример: Южная 8</b>'),
+        Const('<b>Напишите  улицу и № дома откуда поедите\nНапример: Ленина 16</b>'),
         TextInput(
             id='addres2_input',
             type_factory=str,
@@ -203,9 +205,9 @@ start_menu_dialog = Dialog(
         state=AddOrder.address2,
     ),
     Window(
-        Format("🅰️ Начальная точка: <b>{city1_id} - {address1_id}</b>\n"),
-        Format("🅱️ Конечная точка: <b>{city2_id} - {address2_id}</b>\n"),
-        Format("🔃 <b>{add_address}\n</b>", when='first_show'),
+        Format("📍 Начальная точка: <b>{city1_id} - {address1_id}</b>\n"),
+        Format("📍 Конечная точка: <b>{city2_id} - {address2_id}</b>\n"),
+        Format("🔃 <b>{topics[0][0]}\n</b>", when='first_show'),
         Format("<b>Цена:</b> {price} руб"),
         Row(
             Multiselect(
@@ -214,9 +216,14 @@ start_menu_dialog = Dialog(
                 id='multi_topics',
                 item_id_getter=operator.itemgetter(1),
                 items="topics",
-                on_click=commit,
+                # on_click=commit, # если on_click приходится 2 раза нажимать
+                on_state_changed=commit,  # с первого раза элемент
             ),
         ),
+        Button(Const('Добавить адрес'),
+               id='add_address1',
+               on_click=add_new_address1,
+               when='another_hide'),
         Back(Const("Назад")),
         Cancel(Const('Выйти'),
                id='cancel',
@@ -228,9 +235,117 @@ start_menu_dialog = Dialog(
         state=AddOrder.order_start,
     ),
     Window(
+        Const('📍: Выберите дополнительный адрес'),
+        Group(
+            Select(
+                Format('{item.city_name}'),
+                id="add_new_address_id",
+                items="new_address1",
+                item_id_getter=operator.attrgetter('id'),
+                on_click=add_new_address_cb,
+            ),
+            id='add_new_address_ids',
+            width=2,
+        ),
+        Back(Const("Назад")),
+        Cancel(Const('Выйти'),
+               id='cancel',
+               on_click=cancel_in_start),
+        getter=add_new_address_getter,
+        state=AddOrder.add_new_address1
+    ),
+    Window(
+        Const('<b>Напишите  улицу и № дома откуда поедите\nНапример: Северная 12</b>'),
+        TextInput(
+            id='add_street_address1',
+            type_factory=str,
+            on_success=on_choosen_add_address_cb,
+        ),
+        SwitchTo(Const("Назад"),
+                 id='sw5',
+                 state=AddOrder.order_start),
+        state=AddOrder.add_street_address1
+    ),
+    Window(
+        Format("📍: <b>{city1_id} - {address1_id}</b>\n"),
+        Format("📍: <b>{city2_id} - {address2_id}</b>\n"),
+        Format("📍: <b>{add_new_address1} - {add_street_address1}</b>\n"),
+        Format("<b>Цена:</b> {price} руб"),
+        Button(Const('Добавить адрес'),
+               id='add_address2',
+               on_click=add_new_address2),
+        SwitchTo(Const("Назад"),
+                 id='sw6',
+                 state=AddOrder.order_start),
+        Cancel(Const('Выйти'),
+               id='cancel',
+               on_click=cancel_in_start),
+        Button(Const('ЗАКАЗАТЬ'),
+               id='order_with_na1',
+               on_click=order_now_with_new_address1),
+        getter=get_order_with_new_address1,
+        state=AddOrder.order_start_with_new_address1,
+    ),
+    Window(
+        Const('📍: Выберите дополнительный адрес'),
+        Group(
+            Select(
+                Format('{item.city_name}'),
+                id="add_new_address_id2",
+                items="new_address2",
+                item_id_getter=operator.attrgetter('id'),
+                on_click=add_new_address_cb2,
+            ),
+            id='add_new_address_ids2',
+            width=2,
+        ),
+        SwitchTo(Const("Назад"),
+                 id='sw6',
+                 state=AddOrder.order_start),
+        Cancel(Const('Выйти'),
+               id='cancel',
+               on_click=cancel_in_start),
+        getter=add_new_address_getter2,
+        state=AddOrder.add_new_address2
+    ),
+    Window(
+        Const('<b>Напишите  улицу и № дома откуда поедите\nНапример: Горького 12</b>'),
+        TextInput(
+            id='add_street_address2',
+            type_factory=str,
+            on_success=on_choosen_add_address_cb2,
+        ),
+        SwitchTo(Const("Назад"),
+                 id='sw6',
+                 state=AddOrder.order_start),
+        state=AddOrder.add_street_address2
+    ),
+    Window(
+        Format("📍: <b>{city1_id} - {address1_id}</b>\n"),
+        Format("📍: <b>{city2_id} - {address2_id}</b>\n"),
+        Format("📍: <b>{add_new_address1} - {add_street_address1}</b>\n"),
+        Format("📍: <b>{add_new_address2} - {add_street_address2}</b>\n"),
+        Format("<b>Цена:</b> {price} руб"),
+        SwitchTo(Const("Назад"),
+                 id='sw6',
+                 state=AddOrder.order_start),
+        Cancel(Const('Выйти'),
+               id='cancel',
+               on_click=cancel_in_start),
+        Button(Const('ЗАКАЗАТЬ'),
+               id='order_with_na1',
+               on_click=order_now_with_new_address2),
+        getter=get_order_with_new_address2,
+        state=AddOrder.order_start_with_new_address2,
+    ),
+    Window(
         Const("<b>Ожидайте водителя⌛</b>\n"),
-        Format("🅰️ Начальная точка: <b>{city1_id} - {address1_id}</b>\n"),
-        Format("🅱️ Конечная точка: <b>{city2_id} - {address2_id}</b>\n"),
+        Format("📍: <b>{city1_id} - {address1_id}</b>\n"),
+        Format("📍: <b>{city2_id} - {address2_id}</b>\n"),
+        Format("📍: <b>{add_new_address1} - {add_street_address1}</b>\n",
+               when='getter_new_address1'),
+        Format("📍: <b>{add_new_address2} - {add_street_address2}</b>\n",
+               when='getter_new_address2'),
         Format("🔃 <b>{add_address}\n</b>", when='first_show'),
         Format("<b>Цена:</b> {price} руб"),
         Button(Const('⬆️ Ускорить на 20р'),

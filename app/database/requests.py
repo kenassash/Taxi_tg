@@ -80,6 +80,7 @@ async def get_cities_routes_price(city1: str, city2: str):
 
 
 async def get_cities_routes_price_update(city1: str, city2: str, price: int):
+    price = int(price)
     async with async_session() as session:
         price = (
             update(CityRoutes)
@@ -90,7 +91,16 @@ async def get_cities_routes_price_update(city1: str, city2: str, price: int):
         await session.execute(price)
         await session.commit()
 
-
+async def city_routers_update_all(price_delta: str):
+    price_delta = int(price_delta)
+    async with async_session() as session:
+        price = (
+            update(CityRoutes)
+            .values(price=CityRoutes.price + price_delta)
+            .execution_options(synchronize_session="fetch")
+        )
+        await session.execute(price)
+        await session.commit()
 async def set_order(user_id, data):
     user_id = int(user_id)
     async with async_session() as session:

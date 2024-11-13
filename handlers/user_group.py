@@ -87,10 +87,14 @@ async def accept(callback: CallbackQuery, bot: Bot, state: FSMContext):
 
         text_driver = (f"Заказ <b>{order_id.id}</b>\n\n"
                         f"Телефон <b>{order_id.user_rel.phone}</b>\n\n"
-                        f"🅰️:<b>{order_id.city1_id} - {order_id.address1_id.upper()}</b>\n\n"
-                        f"🅱️:<b>{order_id.city2_id} - {order_id.address2_id.upper()}</b>\n\n")
+                        f"📍:<b>{order_id.city1_id} - {order_id.address1_id.upper()}</b>\n\n"
+                        f"📍:<b>{order_id.city2_id} - {order_id.address2_id.upper()}</b>\n\n")
         if order_id.add_address:
             text_driver += f"🔃<b>{order_id.add_address}</b>\n\n"
+        if order_id.add_new_address1:
+            text_driver += f'📍: <b>{order_id.add_new_address1} - {order_id.add_street_address1.upper()}</b>\n\n'
+        if order_id.add_new_address2:
+            text_driver += f'📍: <b>{order_id.add_new_address2} - {order_id.add_street_address2.upper()}</b>\n\n'
         text_driver += (f"Цена: <b>{order_id.price}Р</b>\n\n"
                         f'⌚ Выберите время подачи: ⬇️')
 

@@ -17,6 +17,16 @@ class AddOrder(StatesGroup):
     another2 = State()
 
     order_start = State()
+
+    add_new_address1 = State()
+    add_street_address1 = State()
+
+    order_start_with_new_address1 = State()
+
+    add_new_address2 = State()
+    add_street_address2 = State()
+    order_start_with_new_address2 = State()
+
     upprice = State()
 
 class AddUser(StatesGroup):

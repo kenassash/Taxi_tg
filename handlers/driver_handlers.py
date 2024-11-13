@@ -47,6 +47,10 @@ async def close(callback: CallbackQuery, bot: Bot):
                      f"📍:<b>{order_id.city2_id} - {order_id.address2_id.upper()}</b>\n\n")
         if order_id.add_address:
             text_order += f"🔃<b>{order_id.add_address}</b>\n\n"
+        if order_id.add_new_address1:
+            text_order += f"📍:<b>{order_id.add_new_address1} - {order_id.add_street_address1.upper()}</b>\n\n"
+        if order_id.add_new_address2:
+            text_order += f"📍:<b>{order_id.add_new_address2} - {order_id.add_street_address2.upper()}</b>\n\n"
         text_order += f"Цена: <b>{order_id.price}Р</b>"
         message_driver = await bot.send_message(chat_id=os.getenv('CHAT_GROUP_ID'),
                                                 text=text_order,
@@ -104,6 +108,10 @@ async def timewait(callback: CallbackQuery, bot: Bot):
                         f"📍:<b>{order_id.city2_id} - {order_id.address2_id.upper()}</b>\n\n")
         if order_id.add_address:
             text_driver += f"🔃<b>{order_id.add_address}</b>\n\n"
+        if order_id.add_new_address1:
+            text_driver += f"📍:<b>{order_id.add_new_address1} - {order_id.add_street_address1.upper()}</b>\n\n"
+        if order_id.add_new_address2:
+            text_driver += f"📍:<b>{order_id.add_new_address2} - {order_id.add_street_address2.upper()}</b>\n\n"
         text_driver += f"Цена: <b>{order_id.price}Р</b>"
         message_driver = await callback.message.edit_text(text=text_driver,
                                                           reply_markup=await kb.on_the_spot_kb(order_id.id,
@@ -152,6 +160,10 @@ async def on_the_spot(callback: CallbackQuery, bot: Bot):
                        f"📍:<b>{order_id.city2_id} - {order_id.address2_id.upper()}</b>\n\n")
         if order_id.add_address:
             text_driver += f"🔃<b>{order_id.add_address}</b>\n\n"
+        if order_id.add_new_address1:
+            text_driver += f"📍:<b>{order_id.add_new_address1} - {order_id.add_street_address1.upper()}</b>\n\n"
+        if order_id.add_new_address2:
+            text_driver += f"📍:<b>{order_id.add_new_address2} - {order_id.add_street_address2.upper()}</b>\n\n"
         text_driver += f"Цена: <b>{order_id.price}Р</b>"
         message_driver = await callback.message.edit_text(text=text_driver,
                                                           reply_markup=await kb.close_and_finish(order_id.id,
