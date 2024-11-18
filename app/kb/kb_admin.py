@@ -17,6 +17,7 @@ async def admin_keyboard():
     keyboard.add(InlineKeyboardButton(text='Время сна', callback_data='time_restriction'))
     keyboard.add(InlineKeyboardButton(text='Запрет водителю', callback_data='driver_block'))
     keyboard.add(InlineKeyboardButton(text='Инф-ия о заказе', callback_data='info_order'))
+    keyboard.add(InlineKeyboardButton(text='Ночной тариф', callback_data='nightchange'))
     return keyboard.adjust(2).as_markup()
 
 
@@ -141,5 +142,12 @@ async def driver_no_active():
     for driver in drivers:
         keyboard.add(InlineKeyboardButton(text=f'{driver.name} - {driver.number_car}',
                                           callback_data=f'noactive_{driver.id}'))
+    keyboard.add(InlineKeyboardButton(text='Отменить', callback_data=f'cancelorder_'))
+    return keyboard.adjust(2).as_markup()
+
+async def night_changekb():
+    keyboard = InlineKeyboardBuilder()
+    keyboard.add(InlineKeyboardButton(text='Включить', callback_data='nightchangekb_YES'))
+    keyboard.add(InlineKeyboardButton(text='Отключить', callback_data='nightchangekb_NO'))
     keyboard.add(InlineKeyboardButton(text='Отменить', callback_data=f'cancelorder_'))
     return keyboard.adjust(2).as_markup()

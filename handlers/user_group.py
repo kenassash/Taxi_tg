@@ -57,6 +57,9 @@ async def accept(callback: CallbackQuery, bot: Bot, state: FSMContext):
         # message_id_pass = callback.data.split('_')[2]
         message_id_pass = order_id.chat_id_user
         driver = await get_driver(callback.from_user.id)
+        await callback.message.edit_text(text=f'Номер заказа - <b><code>{order_id.id}</code></b>\n'
+                                              f'Водитель {driver.name} принял заказ',
+                                         reply_markup=await kb.go_to_order())
         # if not driver.active:
         #     await bot.send_message(chat_id=callback.from_user.id,
         #                            text=f"Вы не активны и не можете принимать заказы.\n"
@@ -110,9 +113,6 @@ async def accept(callback: CallbackQuery, bot: Bot, state: FSMContext):
             message_id=message_pass.message_id,
             reply_markup=await kb.delete_order(order_id.id))
 
-        await callback.message.edit_text(text=f'Номер заказа - <b><code>{order_id.id}</code></b>\n'
-                                              f'Водитель {driver.name} принял заказ',
-                                         reply_markup=await kb.go_to_order())
 
 
     except AttributeError:

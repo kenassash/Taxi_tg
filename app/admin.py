@@ -1,12 +1,15 @@
 import json
 import os
 import re
+from datetime import datetime, timedelta
 
 from aiogram import Router, F, Bot
 from aiogram.types import Message, CallbackQuery, ReplyKeyboardRemove
 from aiogram.filters import CommandStart, Command, Filter, or_f
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
+from apscheduler.jobstores.base import JobLookupError, ConflictingIdError
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
 from app.change_price import Settings
 from app.database.requests import add_car, get_all_car, remove_car, print_all_online_executions, \
@@ -78,13 +81,20 @@ async def send_info_order(message: Message, state: FSMContext):
         order = await get_all_orders(data['info_order'])
         # await message.answer(f'{order.price}\n{order.user_rel.tg_id}')
         if order is not None:
+            text_driver = (f"🔥Заказ <b>{order.id}</b>🔥\n\n"
+                           f"📞Телефон <b>{order.user_rel.phone}</b>\n\n"
+                           f"📍:<b>{order.city1_id} - {order.address1_id.upper()}</b>\n\n"
+                           f"📍:<b>{order.city2_id} - {order.address2_id.upper()}</b>\n\n")
+            if order.add_address:
+                text_driver += f"🔃<b>{order.add_address}</b>\n\n"
+            if order.add_new_address1:
+                text_driver += f"📍:<b>{order.add_new_address1} - {order.add_street_address1.upper()}</b>\n\n"
+            if order.add_new_address2:
+                text_driver += f"📍:<b>{order.add_new_address2} - {order.add_street_address2.upper()}</b>\n\n"
+            text_driver += f"Цена: <b>{order.price}Р</b>"
 
-            await message.answer(f"Заказ <b>{order.id}</b>\n\n"
-                                 f"Телефон <b>+{order.user_rel.phone}</b>\n\n"
-                                 f"Начальная точка: <b>{order.city1_id} - {order.address1_id}</b>\n\n"
-                                 f"Конечная точка: <b>{order.city2_id} - {order.address2_id}</b>\n\n"
-                                 f"Цена: <b>{order.price}Р</b>\n\n"
-                                 f"Дата: <b>{order.created}</b>")
+            await message.answer(text_driver)
+
             await state.clear()
         else:
             await message.answer('Ошибка. Такого заказа нет. Введите существующий')
@@ -583,3 +593,58 @@ async def send_user(message: Message, state: FSMContext, bot: Bot):
     else:
         await message.answer('Используй кнопку ответить на сообщение')
         await state.set_state(SendToUser.sendTouser)
+
+@admin.callback_query(IsAdmin(), F.data == 'nightchange')
+async def night_change_cb(callback: CallbackQuery, bot: Bot, state: FSMContext, apscheduler: AsyncIOScheduler):
+    await callback.answer('')
+    await callback.message.answer('Действие 💤', reply_markup=await kb_admin.night_changekb())
+
+
+@admin.callback_query(IsAdmin(), F.data == 'stop_test')
+async def stop_task(callback: CallbackQuery, apscheduler: AsyncIOScheduler):
+    job_id = f"send_message_{callback.from_user.id}"
+    job = apscheduler.get_job(job_id)
+    print("Текущие задачи после добавления:", apscheduler.get_jobs())
+    if job:
+        apscheduler.remove_job(job_id)
+        await callback.answer("Задача успешно отключена!")
+    else:
+        await callback.answer("Нет активной задачи для отключения.")
+
+@admin.callback_query(IsAdmin(), F.data.startswith('nightchangekb_'))
+async def night_change_kb(callback: CallbackQuery, bot: Bot, apscheduler: AsyncIOScheduler):
+    await callback.answer('')
+    answer = callback.data.split('_')[1]
+
+
+    if answer == 'YES':
+        try:
+            apscheduler.add_job(city_routers_update_all,
+                trigger='cron',
+                hour=00,
+                id=f"set_night_price_{callback.from_user.id}",
+                args=['+50'],
+            )
+            apscheduler.add_job(city_routers_update_all,
+                trigger='cron',
+                hour=7,
+                id=f"set_day_price{callback.from_user.id}",
+                args=['-50'],
+            )
+            await callback.message.answer('Задача добавлена с 12 ночи до 7 - +50 рублей во всех связках\nЗадача добавлена с 7 утра до 12 - -50 рублей во всех связках')
+        except ConflictingIdError:
+            await callback.message.answer('Задача добавлена с 12 ночи до 7 часов цена повышена во всех связка на ***')
+            print('Ошибка запуска apscheduler.add_job')
+
+    elif answer == 'NO':
+        job_id1 = f"set_night_price_{callback.from_user.id}"
+        job_id2 = f"set_day_price{callback.from_user.id}"
+        print("Текущие задачи после добавления:", apscheduler.get_jobs())
+        try:
+            apscheduler.remove_job(job_id1)
+            apscheduler.remove_job(job_id2)
+            await callback.message.answer("Задача успешно отключена!")
+        except JobLookupError:
+            await callback.message.answer("Задача успешно отключена!")
+            print('Ошибка остановки apscheduler.add_job')
+

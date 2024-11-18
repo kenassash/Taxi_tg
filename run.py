@@ -13,7 +13,10 @@ from app.common import menu, admin_menu
 from app.dialog import start_menu_order, start_menu_dialog
 from aiogram_dialog import setup_dialogs
 
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
+
 from app.admin import admin
+from middleware.Scheduler_middleware import SchedulerMiddleware
 from middleware.time_restriction_middleware import TimeRestrictionMiddleware
 
 load_dotenv()
@@ -36,15 +39,21 @@ async def main():
     await async_main()
     bot_config = get_config(BotConfig, "bot")
     bot = Bot(token=bot_config.token.get_secret_value(), default=DefaultBotProperties(parse_mode=ParseMode.HTML))
+    scheduler = AsyncIOScheduler(timezone='Asia/Yakutsk')
+    scheduler.start()
 
     bot.my_admins_list = admin_list
     dp = Dispatcher(db_engine=engine)
 
     await bot.set_my_commands(commands=menu, scope=types.BotCommandScopeAllPrivateChats())
     await bot.set_my_commands(commands=admin_menu, scope=types.BotCommandScopeChat(chat_id=os.getenv('CHAT_ID_ADMIN')))
+
     dp.include_routers(admin)
+    dp.callback_query.middleware(SchedulerMiddleware(scheduler))
     dp.include_routers(*routers_list)
     dp.include_routers(start_menu_order, start_menu_dialog)
+
+
     setup_dialogs(dp)
 
     await dp.start_polling(bot)

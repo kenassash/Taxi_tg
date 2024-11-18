@@ -101,8 +101,8 @@ async def timewait(callback: CallbackQuery, bot: Bot):
                                                     f'🚕Номер авто: {driver.number_car}\n'
                                                     f'📞Телефон: {driver.phone}\n'
                                                     f'💰Цена поездки: {order_id.price} руб')
-        text_driver = (f"🔥Заказ <b>{order_id.id}</b>🔥\n\n"
-                        f"⏳Время прибытия <b>{formatted_arrival_time} мин</b>\n\n"
+        text_driver = (f"🔥Заказ <b>{order_id.id}🔥          ⏳{formatted_arrival_time}⏳</b>\n\n"
+                        # f"⏳Время прибытия <b>{formatted_arrival_time} мин</b>\n\n"
                         f"📞Телефон <b>{order_id.user_rel.phone}</b>\n\n"
                         f"📍:<b>{order_id.city1_id} - {order_id.address1_id.upper()}</b>\n\n"
                         f"📍:<b>{order_id.city2_id} - {order_id.address2_id.upper()}</b>\n\n")
