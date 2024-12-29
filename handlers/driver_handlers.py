@@ -228,6 +228,12 @@ async def finish(callback: CallbackQuery, bot: Bot):
         #                                 f'Спасибо что пользуетесь нашими услугами 🙏\n\n'
         #                                 f'До бесплатной поездки осталось {Settings.free_ride - free_ride}',
         #                            reply_markup=await kb.main())
+
+        # Бесплатные поездки
+        user_free_ride = order_id.user_rel.free_ride
+        if user_free_ride == 0:
+            free_ride = 1
+            await save_free_ride(order_id.user_rel.tg_id, free_ride)
         try:
             # удаляю сообщение у пользователя
             await bot.delete_message(chat_id=order_id.user_rel.tg_id, message_id=message_id_pass)

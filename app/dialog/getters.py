@@ -167,16 +167,17 @@ async def get_order(dialog_manager: DialogManager, **kwargs):
     selected_items = dialog_manager.dialog_data.get('selected_items')
 
     price = 0
+    price_route = 0
     data_hide = {}
-
+    user_id = await get_user(dialog_manager.event.from_user.id)
     if city1_id and city2_id:
         # связка изменние цены индивидуально
         price = await get_route_price(city1_id, city2_id)
         data_hide = {'another_hide': True}
         # Бесплатные поездки
-        # user_id = await get_user(dialog_manager.event.from_user.id)
-        # if user_id.free_ride == 0:
-        #     price = 0
+        if user_id.free_ride == 0:
+            price_route += price
+            price = 0
 
     elif another1_id or another2_id:
         # скрыть кнопку "Добавить адрес" если есть другой н.п.
@@ -197,6 +198,9 @@ async def get_order(dialog_manager: DialogManager, **kwargs):
     if selected_items:
         # цена умножается
         price *= 2
+        # Бесплатные поездки
+        if user_id.free_ride == 0:
+            price = price_route
         # Выведет: "Туда-обратно"
         dialog_manager.dialog_data['add_address'] = topics[0][0]
         dialog_manager.dialog_data['price'] = price

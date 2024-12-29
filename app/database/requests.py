@@ -129,7 +129,15 @@ async def save_free_ride(tg_id, free_ride):
                               .values(free_ride=free_ride))
         await session.commit()
 
-
+async def save_free_ride_by_phone(phone, free_ride):
+    async with (async_session() as session):
+        result = await session.execute(update(User)
+                              .where(User.phone == phone)
+                              .values(free_ride=free_ride)
+                              .returning(User.tg_id))
+        await session.commit()
+        tg_id = result.scalar()  # scalar() возвращает одну строку
+        return tg_id
 async def get_all_orders(id):
     id = int(id)
     async with async_session() as session:

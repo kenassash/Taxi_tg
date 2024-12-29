@@ -15,7 +15,7 @@ from app.change_price import Settings
 from app.database.requests import add_car, get_all_car, remove_car, print_all_online_executions, \
     get_all_drivers_with_update_date, get_users, get_one_car, get_driver_info, reset_to_zero, update_car, \
     get_users_count, add_change_price, ban_user, get_ban_all_user, get_cities_routes_price, \
-    get_cities_routes_price_update, no_active, get_all_orders, city_routers_update_all
+    get_cities_routes_price_update, no_active, get_all_orders, city_routers_update_all, save_free_ride_by_phone
 
 import app.keyboards as kb
 import app.kb.kb_admin as kb_admin
@@ -484,8 +484,8 @@ async def info_car_driver(callback: CallbackQuery):
         # Добавляем информацию о заказах с нулевой стоимостью, если такие есть
         if zero_price_orders_count > 0:
             message_text += f"<b>Заказов с нулевой стоимостью: {zero_price_orders_count}</b>\n"
-            for info in zero_price_orders_info:
-                message_text_point += f"Начальная точка: <b>{info['start_point']}</b>\nКонечная точка: <b>{info['end_point']}</b>\n\n"
+            # for info in zero_price_orders_info:
+            #     message_text_point += f"Начальная точка: <b>{info['start_point']}</b>\nКонечная точка: <b>{info['end_point']}</b>\n\n"
 
         # Создаем словарь для хранения количества заказов по датам
         orders_by_date = {}
@@ -500,8 +500,8 @@ async def info_car_driver(callback: CallbackQuery):
 
         await callback.answer('')
         await callback.message.answer(message_text, reply_markup=await kb.reset_zero(driver_id))
-        if zero_price_orders_count > 0:
-            await callback.message.answer(text=message_text_point)
+        # if zero_price_orders_count > 0:
+        #     await callback.message.answer(text=message_text_point)
         # if total_orders > 0 :
         #     await callback.message.answer(text=message_text_id)
     else:
@@ -593,9 +593,9 @@ async def send_user(message: Message, state: FSMContext, bot: Bot):
     else:
         await message.answer('Используй кнопку ответить на сообщение')
         await state.set_state(SendToUser.sendTouser)
-
+# автоматические изменение цены
 @admin.callback_query(IsAdmin(), F.data == 'nightchange')
-async def night_change_cb(callback: CallbackQuery, bot: Bot, state: FSMContext, apscheduler: AsyncIOScheduler):
+async def night_change_cb(callback: CallbackQuery):
     await callback.answer('')
     await callback.message.answer('Действие 💤', reply_markup=await kb_admin.night_changekb())
 
@@ -648,3 +648,33 @@ async def night_change_kb(callback: CallbackQuery, bot: Bot, apscheduler: AsyncI
             await callback.message.answer("Задача успешно отключена!")
             print('Ошибка остановки apscheduler.add_job')
 
+# дать пользователю бесплатную поездку
+class FreeOrder(StatesGroup):
+    free_order_user = State()
+@admin.callback_query(IsAdmin(), F.data == 'freeorder')
+async def freeorder(callback: CallbackQuery, state: FSMContext):
+    await callback.answer('')
+    await callback.message.answer('Введите номер телефона кому предоставить бесплатную поездку\nПример: +79981662233',
+                                  reply_markup=await kb.cancel_order())
+    await state.set_state(FreeOrder.free_order_user)
+
+@admin.message(IsAdmin(), FreeOrder.free_order_user, F.text)
+async def ban_users3(message: Message, state: FSMContext, bot: Bot):
+    input_int = message.text.strip()
+    pattern = r"^\+7\d{10}$"
+    if re.match(pattern, input_int):
+        await state.update_data(phone=input_int, free_ride=0)
+        data = await state.get_data()
+        tg_id = await save_free_ride_by_phone(data['phone'], data['free_ride'])
+        if tg_id:
+            await bot.send_message(
+                chat_id=tg_id,
+                text=f'Поздравляем! Ваша следующая поездка будет бесплатной! 🎉',
+                reply_markup=await kb.main()
+            )
+            await message.answer("Операция прошла успешно")
+        else:
+            await message.answer("Пользователь с таким номером телефона не найден.")
+        await state.clear()
+    else:
+        await message.answer("Введите номер телефона  в формате +79991115577")

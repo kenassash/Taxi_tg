@@ -18,6 +18,7 @@ async def admin_keyboard():
     keyboard.add(InlineKeyboardButton(text='Запрет водителю', callback_data='driver_block'))
     keyboard.add(InlineKeyboardButton(text='Инф-ия о заказе', callback_data='info_order'))
     keyboard.add(InlineKeyboardButton(text='Ночной тариф', callback_data='nightchange'))
+    keyboard.add(InlineKeyboardButton(text='Бесплатная поездка', callback_data='freeorder'))
     return keyboard.adjust(2).as_markup()
 
 
