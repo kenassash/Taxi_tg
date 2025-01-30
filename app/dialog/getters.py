@@ -139,7 +139,10 @@ async def add_new_address_getter2(dialog_manager: DialogManager, **kwargs, ):
 async def getter_another_outside1(dialog_manager: DialogManager, **kwargs):
     another_outside1 = await get_cities_outside()
     data = {
-        'another_outside1': [(city.city_name, city.id) for city in another_outside1],
+        'another_outside1': sorted(
+            [(city.city_name, city.id) for city in another_outside1],
+            key=lambda x: x[0]  # Сортируем по названию города
+        ),
     }
     return data
 
@@ -147,7 +150,10 @@ async def getter_another_outside1(dialog_manager: DialogManager, **kwargs):
 async def getter_another_outside2(dialog_manager: DialogManager, **kwargs):
     another_outside2 = await get_cities_outside()
     data = {
-        'another_outside2': [(city.city_name, city.id) for city in another_outside2],
+        'another_outside2': sorted(
+            [(city.city_name, city.id) for city in another_outside2],
+            key=lambda x: x[0]  # Сортируем по названию города
+        ),
     }
     return data
 
