@@ -61,3 +61,8 @@
 ![Скриншот Сделать заказ](https://github.com/kenassash/Taxi_tg/blob/master/img/4.png)
 ![Скриншот Админ панель](https://github.com/kenassash/Taxi_tg/blob/master/img/5.png)
 ![Скриншот Информация о заказе](https://github.com/kenassash/Taxi_tg/blob/master/img/6.png)
+
+Работа с alembic
+
+alembic revision --autogenerate -m "First migration"
+alembic upgrade head

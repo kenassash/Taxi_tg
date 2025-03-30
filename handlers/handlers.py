@@ -184,8 +184,8 @@ async def get_manager(message: Message, state: FSMContext, bot: Bot):
                                reply_markup=await kb_ad.send_to_user())
 
         await state.clear()
-        await message.answer('Спасибо за сообщение. В скором времени с вами свяжется менеджер',
-                             reply_markup=await kb.main())
+        await message.answer('Спасибо за сообщение. В скором времени с вами свяжется менеджер')
+                             #reply_markup=await kb.main())
 
     # elif message.voice:
     #     await state.update_data(send_manager=message.voice)

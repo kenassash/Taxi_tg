@@ -12,7 +12,7 @@ from app.database.requests import (
     get_user,
     set_order,
     set_chat_id_user,
-    up_price_passager
+    up_price_passager, get_least_loaded_driver
 )
 from app.dialog.states import AddOrder
 import app.keyboards as kb
@@ -203,7 +203,8 @@ async def order_now(callback: CallbackQuery,
 
 
     # await bg.start(data=data_test, mode=StartMode.NORMAL, state=AddOrder.upprice)
-    message_id_driver = await dialog_manager.event.bot.send_message(chat_id=os.getenv('CHAT_GROUP_ID'),
+    await get_least_loaded_driver()
+    message_id_driver = await dialog_manager.event.bot.send_message(chat_id=216159472,
                                                                     text=text_order,
                                                                     reply_markup=await kb.accept(order_id))
     #

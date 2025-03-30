@@ -31,3 +31,6 @@ class AddOrder(StatesGroup):
 
 class AddUser(StatesGroup):
     phone = State()
+
+class SendMessage(StatesGroup):
+    send_manager = State()

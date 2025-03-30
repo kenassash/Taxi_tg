@@ -87,6 +87,7 @@ class Driver(Base):
     car_name: Mapped[str] = mapped_column(String(100), nullable=True)
     number_car: Mapped[str] = mapped_column(String(100), nullable=True)
     photo_car: Mapped[str] = mapped_column(String(150), nullable=True)
+    price: Mapped[int] = mapped_column(nullable=True)
 
     active: Mapped[bool] = mapped_column(Boolean, default=True)
 

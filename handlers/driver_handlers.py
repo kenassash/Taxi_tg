@@ -1,8 +1,9 @@
 import os
 from aiogram import Router, F, Bot
 from aiogram.exceptions import TelegramBadRequest
+from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
-from aiogram.types import CallbackQuery
+from aiogram.types import CallbackQuery, Message
 from dotenv import load_dotenv
 from datetime import datetime, timedelta
 
@@ -252,3 +253,23 @@ async def finish(callback: CallbackQuery, bot: Bot):
     except AttributeError:
         await callback.answer('')
         await callback.message.answer('Пассажир отменил заказ')
+
+# тестирую личную карточку водителя
+@driver_router.message(Command('driver'))
+async def driver_lk(message: Message, bot: Bot):
+    driver_id = await get_driver(message.from_user.id)
+    if driver_id.active:
+        status_text = "🟢 На линии"
+    else:
+        status_text = "🔴 Не на линии"
+    text_driver = (f"Здравствуйте, {driver_id.name}\n\n"
+                   f"<b>Автомобиль: </b>{driver_id.car_name}, {driver_id.number_car}\n"
+                   f"<b>Статус: </b>{status_text}\n"
+                   f"<b>Телефон: </b>{driver_id.phone}\n\n\n"
+                   f"<b>Баланс</b> {driver_id.price}\n"
+                   f"<b>Бонусы</b> {driver_id.price}\n\n"
+                   f"<b>Стоимость выхода на линию:</b> {driver_id.price}\n"
+                   f"Ночной тариф с <b>23:01</b> до <b>06:01</b>")
+    await bot.send_photo(chat_id=message.from_user.id,
+                         photo=driver_id.photo_car,
+                         caption=text_driver)

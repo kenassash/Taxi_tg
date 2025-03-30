@@ -3,7 +3,7 @@ from sqlalchemy.orm import joinedload, selectinload
 from app.database.models import User, Order, Driver, OnlineExecution, Base, CityOutside, CityInside, CityRoutes
 from app.database.models import async_session
 
-from sqlalchemy import select, update, delete, desc, or_
+from sqlalchemy import select, update, delete, desc, or_, func
 
 
 async def set_user(tg_id, phone):
@@ -210,6 +210,7 @@ async def update_car(data):
 
 
 async def remove_car(id):
+    id = int(id)
     async with async_session() as session:
         await session.execute(delete(Driver).where(Driver.id == id))
         await session.commit()
@@ -437,3 +438,16 @@ async def get_route_price(city1: str, city2: str):
         result = await session.execute(route)
         route = result.scalar_one_or_none()
         return route.price if route else None
+
+async def get_least_loaded_driver():
+    async with async_session() as session:
+        """Получает водителя с наименьшим количеством заказов"""
+        result = await session.execute(
+            select(Driver.id, func.count(OnlineExecution.order_id).label("order_count"))
+            .outerjoin(OnlineExecution, Driver.id == OnlineExecution.driver_id)
+            .where(Driver.active == True)
+            .group_by(Driver.id)
+            .order_by("order_count")  # Водитель с наименьшей загрузкой будет первым
+
+        )
+        print(result.all())

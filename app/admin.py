@@ -179,7 +179,7 @@ async def edit_car(callback: CallbackQuery):
 async def edit_car_1(callback: CallbackQuery, state: FSMContext):
     await callback.answer('')
     driver = await get_one_car(callback.data.split('_')[1])
-    # await callback.message.answer_photo(photo=driver.photo_car)
+    await callback.message.answer_photo(photo=driver.photo_car)
     await callback.message.answer(f"Телефон - {driver.phone}\n"
                                   f"Имя - {driver.name}\n"
                                   f"Название - {driver.car_name}\n"
@@ -199,7 +199,7 @@ async def edit_car_2(message: Message, state: FSMContext):
         data = await state.get_data()
         patterns = {
             'имя': re.compile(r'^Имя\s+(.+)$', re.IGNORECASE),
-            'телефон': re.compile(r'^Телефон\s+([7]\d{10})$', re.IGNORECASE),
+            'телефон': re.compile(r'^Телефон\s+(\+7\d{10})$', re.IGNORECASE),
             'название': re.compile(r'^Название\s+(.+)$', re.IGNORECASE),
             'номер': re.compile(r'^Номер\s+(.+)$', re.IGNORECASE),
         }
@@ -489,7 +489,8 @@ async def info_car_driver(callback: CallbackQuery):
 
         # Создаем словарь для хранения количества заказов по датам
         orders_by_date = {}
-        for order in driver_info.orders_reply:
+        sorted_orders = sorted(driver_info.orders_reply, key=lambda order: order.created)
+        for order in sorted_orders:
             date = order.created.date()
             orders_by_date[date] = orders_by_date.get(date, 0) + 1
             # message_text_id += f'<code>{order.id}</code>, '
