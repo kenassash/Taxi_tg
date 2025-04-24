@@ -19,6 +19,7 @@ async def admin_keyboard():
     keyboard.add(InlineKeyboardButton(text='Инф-ия о заказе', callback_data='info_order'))
     keyboard.add(InlineKeyboardButton(text='Ночной тариф', callback_data='nightchange'))
     keyboard.add(InlineKeyboardButton(text='Бесплатная поездка', callback_data='freeorder'))
+    keyboard.add(InlineKeyboardButton(text='Пополнить баланс водителю', callback_data='add_balance'))
     return keyboard.adjust(2).as_markup()
 
 
@@ -67,6 +68,14 @@ async def all_car():
     keyboard.add(InlineKeyboardButton(text='Отменить', callback_data=f'cancelorder_'))
     return keyboard.adjust(2).as_markup()
 
+async def add_balance():
+    drivers = await get_all_car()
+    keyboard = InlineKeyboardBuilder()
+    for driver in drivers:
+        keyboard.add(InlineKeyboardButton(text=f'{driver.name} - {driver.number_car}',
+                                          callback_data=f'addbalance_{driver.id}'))
+    keyboard.add(InlineKeyboardButton(text='Отменить', callback_data=f'cancelorder_'))
+    return keyboard.adjust(2).as_markup()
 
 async def change_money():
     keyboard = InlineKeyboardBuilder()

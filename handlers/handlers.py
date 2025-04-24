@@ -18,7 +18,8 @@ import app.kb.kb_admin as kb_ad
 from app.change_price import Settings
 from app.dialog.states import StartOrder, AddUser, AddOrder
 # from app.geolocation import coords_to_address, addess_to_coords
-from app.database.requests import set_user, get_user, add_car, shop_add, get_order_driver, delete_order_pass
+from app.database.requests import set_user, get_user, add_car, shop_add, get_order_driver, delete_order_pass, \
+    update_driver
 from filters.chat_type import ChatTypeFilter
 # from app.calculate import length_way
 from middleware.ban_middleware import CheckUserBannedMiddleware
@@ -110,20 +111,19 @@ async def process_invalid_phone(message: Message):
 async def delete_order_passager(callback: CallbackQuery, bot: Bot, state: FSMContext):
     await callback.answer('')
     order_id = callback.data.split('_')[1]
-    # state_data = await state.get_data()
-    # message_id = state_data.get('message_id')
     driver_id = await get_order_driver(order_id)
     message_id_driver = driver_id.chat_id_driver
     message_id = driver_id.chat_id_user
     if driver_id.drivers_reply:
         driver = driver_id.drivers_reply[0]
-        # message_id_driver = callback.data.split('_')[2]
+        await update_driver(driver.tg_id, price=int(driver.price + int(driver_id.price * 0.10)))
         await bot.edit_message_text(chat_id=driver.tg_id,
                                     message_id=message_id_driver,
                                     text=f"Заказ <code>{driver_id.id}</code>\n"
                                          f"<b>❌Пассажир отменил заказ</b>\n\n"
                                          f"Телефон <b>{driver_id.user_rel.phone}</b>")
         await callback.message.delete()
+
         await callback.message.answer(f'Заказ отменен')
 
         await delete_order_pass(order_id)
@@ -139,20 +139,6 @@ async def delete_order_passager(callback: CallbackQuery, bot: Bot, state: FSMCon
         await callback.message.answer(f'Заказ отменен')
         await state.clear()
         return
-    # await callback.message.edit_text(f'Заказ отменен',
-    #                                  reply_markup=await kb.main())
-    # await bot.edit_message_text(chat_id=os.getenv('CHAT_GROUP_ID'),
-    #                             message_id=message_id,
-    #                             text=f"Пассажир отменил заказ\n{print(message_id)}")
-
-    # # Проверка, если список drivers_reply пуст
-    # if not driver_id.drivers_reply:
-    #     await callback.message.answer('Нет водителей для данного заказа')
-    # else:
-    #     driver = driver_id.drivers_reply[0]
-    #     await bot.send_message(chat_id=driver.tg_id, text='Пассажир отменил заказ')
-
-    # await delete_order_pass(order_id)
 
 
 # -------------отправка сообщения администраторам\менеджерам

@@ -204,7 +204,7 @@ async def order_now(callback: CallbackQuery,
 
     # await bg.start(data=data_test, mode=StartMode.NORMAL, state=AddOrder.upprice)
     await get_least_loaded_driver()
-    message_id_driver = await dialog_manager.event.bot.send_message(chat_id=216159472,
+    message_id_driver = await dialog_manager.event.bot.send_message(chat_id=os.getenv('CHAT_GROUP_ID'),
                                                                     text=text_order,
                                                                     reply_markup=await kb.accept(order_id))
     #

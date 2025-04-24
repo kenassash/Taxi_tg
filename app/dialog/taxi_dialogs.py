@@ -193,7 +193,7 @@ start_menu_dialog = Dialog(
         state=AddOrder.another2,
     ),
     Window(
-        Const('<b>Напишите  улицу и № дома откуда поедите\nНапример: Ленина 16</b>'),
+        Const('<b>Напишите  улицу и № дома куда поедите\nНапример: Ленина 16</b>'),
         TextInput(
             id='addres2_input',
             type_factory=str,
@@ -255,7 +255,7 @@ start_menu_dialog = Dialog(
         state=AddOrder.add_new_address1
     ),
     Window(
-        Const('<b>Напишите  улицу и № дома откуда поедите\nНапример: Северная 12</b>'),
+        Const('<b>Напишите  улицу и № дома куда поедите\nНапример: Северная 12</b>'),
         TextInput(
             id='add_street_address1',
             type_factory=str,
@@ -309,7 +309,7 @@ start_menu_dialog = Dialog(
         state=AddOrder.add_new_address2
     ),
     Window(
-        Const('<b>Напишите  улицу и № дома откуда поедите\nНапример: Горького 12</b>'),
+        Const('<b>Напишите  улицу и № дома куда поедите\nНапример: Горького 12</b>'),
         TextInput(
             id='add_street_address2',
             type_factory=str,

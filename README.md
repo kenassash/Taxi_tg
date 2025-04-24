@@ -64,5 +64,5 @@
 
 Работа с alembic
 
-alembic revision --autogenerate -m "First migration"
+alembic revision --autogenerate -m "add price to drivers"
 alembic upgrade head

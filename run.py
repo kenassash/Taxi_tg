@@ -22,19 +22,7 @@ from middleware.time_restriction_middleware import TimeRestrictionMiddleware
 load_dotenv()
 
 admin_list = [int(id.strip()) for id in os.getenv('CHAT_ID_ADMIN').split(",")]
-# async def main():
-#     await async_main()
-#     bot = Bot(token=os.getenv('TOKEN'), default=DefaultBotProperties(parse_mode=ParseMode.HTML))
-#     bot.my_admins_list = admin_list
-#     dp = Dispatcher()
-#
-#     await bot.set_my_commands(commands=menu, scope=types.BotCommandScopeAllPrivateChats())
-#     await bot.set_my_commands(commands=admin_menu, scope=types.BotCommandScopeChat(chat_id=os.getenv('CHAT_ID_ADMIN')))
-#     dp.include_routers(admin)
-#     dp.include_routers(*routers_list)
-#     dp.include_routers(start_menu_order, start_menu_dialog)
-#     setup_dialogs(dp)
-#     await dp.start_polling(bot)
+
 async def main():
     await async_main()
     bot_config = get_config(BotConfig, "bot")

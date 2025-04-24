@@ -15,7 +15,8 @@ from app.change_price import Settings
 from app.database.requests import add_car, get_all_car, remove_car, print_all_online_executions, \
     get_all_drivers_with_update_date, get_users, get_one_car, get_driver_info, reset_to_zero, update_car, \
     get_users_count, add_change_price, ban_user, get_ban_all_user, get_cities_routes_price, \
-    get_cities_routes_price_update, no_active, get_all_orders, city_routers_update_all, save_free_ride_by_phone
+    get_cities_routes_price_update, no_active, get_all_orders, city_routers_update_all, save_free_ride_by_phone, \
+    update_driver
 
 import app.keyboards as kb
 import app.kb.kb_admin as kb_admin
@@ -679,3 +680,41 @@ async def ban_users3(message: Message, state: FSMContext, bot: Bot):
         await state.clear()
     else:
         await message.answer("Введите номер телефона  в формате +79991115577")
+
+# Пополнить баланс водителя
+class Add_balance(StatesGroup):
+    add_balance = State()
+@admin.callback_query(IsAdmin(), F.data == 'add_balance')
+async def add_balance1(callback: CallbackQuery, state: FSMContext):
+    await callback.answer('')
+    await callback.message.answer('Выберите автомобиль',
+                                  reply_markup=await kb_admin.add_balance())
+
+@admin.callback_query(IsAdmin(), F.data.startswith('addbalance_'))
+async def add_balance2(callback: CallbackQuery, bot: Bot, state: FSMContext):
+    await callback.answer('')
+    driver_id = int(callback.data.split('_')[1])  # Получаем идентификатор водителя из колбэка
+    driver_info = await get_driver_info(driver_id)
+    text_driver = (f"<b>Автомобиль: </b>{driver_info.car_name}, {driver_info.number_car}\n"
+                   f"<b>Телефон: </b>{driver_info.phone}\n"
+                   f"<b>Баланс</b> {driver_info.price}\n")
+    await bot.send_photo(chat_id=callback.from_user.id,
+                         photo=driver_info.photo_car,
+                         caption=text_driver)
+    await callback.message.answer('Введите cумму которую пополнить баланс у водителя',
+                                  reply_markup=await kb.cancel_order())
+    await state.update_data(driver_id=driver_info.tg_id)
+    await state.set_state(Add_balance.add_balance)
+
+@admin.message(IsAdmin(), Add_balance.add_balance, F.text)
+async def add_balance3(message: Message, state: FSMContext, bot: Bot):
+    input_int = message.text.strip()
+    pattern = r"^\d+$"
+    if re.match(pattern, input_int):
+        await state.update_data(price=input_int)
+        data = await state.get_data()
+        await update_driver(data['driver_id'], price=int(data['price']))
+        await message.answer(f"Баланс водителя пополнен на {data['price']}")
+        await state.clear()
+    else:
+        await message.answer("Пожалуйста, введите только цифры.")

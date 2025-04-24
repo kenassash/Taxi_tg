@@ -162,6 +162,10 @@ async def get_driver(tg_id):
         driver = await session.scalar(select(Driver).where(Driver.tg_id == tg_id))
         return driver
 
+async def update_driver(tg_id, **values):
+    async with async_session() as session:
+        await session.execute(update(Driver).where(Driver.tg_id == tg_id).values(**values))
+        await session.commit()
 
 async def get_user(tg_id):
     async with async_session() as session:
