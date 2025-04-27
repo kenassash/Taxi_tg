@@ -14,14 +14,12 @@ from dotenv import load_dotenv
 import app.keyboards as kb
 import app.kb.kb_admin as kb_ad
 
-# import app.keyboard_city as kb_city
 from app.change_price import Settings
 from app.dialog.states import StartOrder, AddUser, AddOrder
-# from app.geolocation import coords_to_address, addess_to_coords
 from app.database.requests import set_user, get_user, add_car, shop_add, get_order_driver, delete_order_pass, \
     update_driver
+from app.dialog_info.info_dialogs import Information
 from filters.chat_type import ChatTypeFilter
-# from app.calculate import length_way
 from middleware.ban_middleware import CheckUserBannedMiddleware
 from middleware.shop_middleware import ShopMiddleware
 from middleware.user_check_middleware import UserCheckMiddleware
@@ -300,3 +298,20 @@ async def add_shop(message: Message, state: FSMContext):
         await state.clear()
     else:
         await message.answer('Введите корретно название магазина')
+
+
+@router.message(Command('info'))
+async def cmd_start(message: Message,
+                    dialog_manager: DialogManager,
+                    state: FSMContext):
+    # Запуск диалога при нажатии на кнопку "info"
+    user_id = message.from_user.id
+    user = await get_user(user_id)
+    if user:
+        await dialog_manager.start(state=Information.info_np,
+                                   mode=StartMode.RESET_STACK)
+    else:
+        await message.answer(f'Добро пожаловать в такси городок!\n'
+                             f'Пожалуйста, отправьте свой номер телефона для регистрации c помощью кнопки:',
+                             reply_markup=await kb.phone())
+        await state.set_state(StartOrder.request_phone)

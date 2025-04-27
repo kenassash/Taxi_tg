@@ -7,9 +7,11 @@ from aiogram.enums import ParseMode
 from dotenv import load_dotenv
 
 from app.database.models import async_main, engine
+
 from config_reader import get_config, BotConfig
 from handlers import routers_list
 from app.common import menu, admin_menu
+from app.dialog_info import info_menu
 from app.dialog import start_menu_order, start_menu_dialog
 from aiogram_dialog import setup_dialogs
 
@@ -40,6 +42,7 @@ async def main():
     dp.callback_query.middleware(SchedulerMiddleware(scheduler))
     dp.include_routers(*routers_list)
     dp.include_routers(start_menu_order, start_menu_dialog)
+    dp.include_routers(info_menu)
 
 
     setup_dialogs(dp)

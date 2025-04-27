@@ -8,7 +8,7 @@ from dotenv import load_dotenv
 from datetime import datetime, timedelta
 
 from app.database.requests import get_all_orders, get_driver, delete_order_execution, delete_order_pass, \
-    get_order_driver, save_free_ride, set_chat_id_driver, set_chat_id_user
+    get_order_driver, save_free_ride, set_chat_id_driver, set_chat_id_user, update_driver
 from filters.chat_type import ChatTypeFilter
 from app.change_price import Settings
 import app.keyboards as kb
@@ -43,9 +43,9 @@ async def close(callback: CallbackQuery, bot: Bot):
                                                  text=f'<b>Ожидайте ⌛</b>\n'
                                                       f'Будет назначен новый водитель в ближайшее время\n')
         text_order = (f'Водитель {driver_id.name} отменил выпонлнение заказа\n'
-                     f"📞Телефон <b>{order_id.user_rel.phone}</b>\n\n"
-                     f"📍:<b>{order_id.city1_id} - {order_id.address1_id.upper()}</b>\n\n"
-                     f"📍:<b>{order_id.city2_id} - {order_id.address2_id.upper()}</b>\n\n")
+                      f"📞Телефон <b>{order_id.user_rel.phone}</b>\n\n"
+                      f"📍:<b>{order_id.city1_id} - {order_id.address1_id.upper()}</b>\n\n"
+                      f"📍:<b>{order_id.city2_id} - {order_id.address2_id.upper()}</b>\n\n")
         if order_id.add_address:
             text_order += f"🔃<b>{order_id.add_address}</b>\n\n"
         if order_id.add_new_address1:
@@ -58,6 +58,7 @@ async def close(callback: CallbackQuery, bot: Bot):
                                                 reply_markup=await kb.accept(order_id.id))
 
         await callback.message.edit_text(f'Вы отказались от заказа <b>№{order_id.id}</b>')
+        await update_driver(driver_id.tg_id, price=int(driver_id.price + int(driver_id.price * 0.10)))
 
         await set_chat_id_driver(order_id.id, message_id_pass.message_id)
         await set_chat_id_user(order_id.id, message_driver.message_id)
@@ -103,10 +104,10 @@ async def timewait(callback: CallbackQuery, bot: Bot):
                                                     f'📞Телефон: {driver.phone}\n'
                                                     f'💰Цена поездки: {order_id.price} руб')
         text_driver = (f"🔥Заказ <b>{order_id.id}🔥          ⏳{formatted_arrival_time}⏳</b>\n\n"
-                        # f"⏳Время прибытия <b>{formatted_arrival_time} мин</b>\n\n"
-                        f"📞Телефон <b>{order_id.user_rel.phone}</b>\n\n"
-                        f"📍:<b>{order_id.city1_id} - {order_id.address1_id.upper()}</b>\n\n"
-                        f"📍:<b>{order_id.city2_id} - {order_id.address2_id.upper()}</b>\n\n")
+                       # f"⏳Время прибытия <b>{formatted_arrival_time} мин</b>\n\n"
+                       f"📞Телефон <b>{order_id.user_rel.phone}</b>\n\n"
+                       f"📍:<b>{order_id.city1_id} - {order_id.address1_id.upper()}</b>\n\n"
+                       f"📍:<b>{order_id.city2_id} - {order_id.address2_id.upper()}</b>\n\n")
         if order_id.add_address:
             text_driver += f"🔃<b>{order_id.add_address}</b>\n\n"
         if order_id.add_new_address1:
@@ -139,7 +140,7 @@ async def on_the_spot(callback: CallbackQuery, bot: Bot):
         # message_id = callback.data.split('_')[2]
         message_id = order_id.chat_id_user
         try:
-        # удаляю сообщение у пользователя
+            # удаляю сообщение у пользователя
             await bot.delete_message(chat_id=order_id.user_rel.tg_id, message_id=message_id)
         except TelegramBadRequest as e:
             if "message to delete not found" in str(e):
@@ -211,7 +212,7 @@ async def finish(callback: CallbackQuery, bot: Bot):
         # Удаляем запись запись о начале выполнения заказа
         # await delete_order_execution(order_id.id, driver_id.id)
         # Увеличиваем счетчик поездок
-        #Бесплатные поездки
+        # Бесплатные поездки
         # user_free_ride = order_id.user_rel.free_ride
         # user_free_ride += 1
         # if user_free_ride == Settings.free_ride:
@@ -254,6 +255,7 @@ async def finish(callback: CallbackQuery, bot: Bot):
         await callback.answer('')
         await callback.message.answer('Пассажир отменил заказ')
 
+
 # тестирую личную карточку водителя
 @driver_router.message(Command('driver'))
 async def driver_lk(message: Message, bot: Bot):
@@ -264,11 +266,11 @@ async def driver_lk(message: Message, bot: Bot):
         status_text = "🔴 Не на линии"
     text_driver = (f"Здравствуйте, {driver_id.name}\n\n"
                    f"<b>Автомобиль: </b>{driver_id.car_name}, {driver_id.number_car}\n"
-                   #f"<b>Статус: </b>{status_text}\n"
+                   # f"<b>Статус: </b>{status_text}\n"
                    f"<b>Телефон: </b>{driver_id.phone}\n"
                    f"<b>Баланс: </b> {driver_id.price}рублей\n\n"
-                   #f"<b>Бонусы</b> {driver_id.price}\n\n"
-                   #f"<b>Стоимость выхода на линию:</b> {driver_id.price}\n"
+                   # f"<b>Бонусы</b> {driver_id.price}\n\n"
+                   # f"<b>Стоимость выхода на линию:</b> {driver_id.price}\n"
                    f"Ночной тариф с <b>23:01</b> до <b>06:01</b>")
     await bot.send_photo(chat_id=message.from_user.id,
                          photo=driver_id.photo_car,
