@@ -31,8 +31,8 @@ async def shop_price(callback: CallbackQuery, state: FSMContext, bot: Bot):
     user_id = await get_user(callback.from_user.id)
     price = callback.data.split('_')[1]
     data = {
-        'city1_id': 'Магазин ' + user_id.shop_name,
-        'city2_id': 'Магазин ' + user_id.shop_name,
+        'city1_id': user_id.shop_name,
+        'city2_id': user_id.shop_name,
         'address1_id': 'доставка',
         'address2_id': 'доставка',
 
@@ -46,7 +46,7 @@ async def shop_price(callback: CallbackQuery, state: FSMContext, bot: Bot):
                                                            reply_markup=await kb.delete_order(order_id))
 
     sent_message = await bot.send_message(chat_id=os.getenv('CHAT_GROUP_ID'),
-                                          text=f"Магазин '<b>{user_id.shop_name}</b>' доставка!\n"
+                                          text=f"<b>{user_id.shop_name}</b>' доставка!\n"
                                                f"Цена: <b>{price}Р</b>",
                                           reply_markup=await kb.accept(order_id))
     await set_chat_id_driver(order_data.id, sent_driver_message.message_id)
@@ -86,8 +86,9 @@ async def shop_point_end_addres(message: Message, state: FSMContext, bot: Bot):
     if re.match(pattern, input_int):
         await state.update_data(price=int(input_int))
         data = await state.get_data()
-        data.update({'city1_id': 'Магазин',
-                     'city2_id': 'Магазин',
+        user_id = await get_user(message.from_user.id)
+        data.update({'city1_id': user_id.shop_name,
+                     'city2_id': user_id.shop_name,
                      'address1_id': 'Доставка'})
         user_id = await get_user(message.from_user.id)
         order_id = await set_order(user_id.id, data)
@@ -95,7 +96,7 @@ async def shop_point_end_addres(message: Message, state: FSMContext, bot: Bot):
         sent_driver_message = await message.answer(f"<b>Ожидайте водителя⌛</b>",
                                                    reply_markup=await kb.delete_order(order_id))
         sent_message = await bot.send_message(chat_id=os.getenv('CHAT_GROUP_ID'),
-                                              text=f"Магазин '<b>{user_id.shop_name}</b>' доставка!\n"
+                                              text=f"<b>{user_id.shop_name}</b>' доставка!\n"
                                                    f"Конечная точка: <b>{data['address2_id']}</b>\n\n"
                                                    f"Цена: <b>{data['price']}Р</b>",
                                               reply_markup=await kb.accept(order_id))

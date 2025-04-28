@@ -192,9 +192,9 @@ async def finish(callback: CallbackQuery, bot: Bot):
         message_id_pass = order_id.chat_id_user
         # Проверяем что это был магазин
         # data = order_id.point_start
-        data = order_id.city1_id
-        text = data.split(' ')[0]
-        if text == 'Магазин':
+        # data = order_id.city1_id
+        # text = data.split(' ')[0]
+        if order_id.user_rel.shop_activate:
             await callback.message.delete()
             try:
                 # удаляю сообщение у пользователя

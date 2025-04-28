@@ -35,7 +35,7 @@ async def main():
     bot.my_admins_list = admin_list
     dp = Dispatcher(db_engine=engine)
 
-    await bot.set_my_commands(commands=menu, scope=types.BotCommandScopeAllPrivateChats())
+    await bot.set_my_commands(commands=menu)
     await bot.set_my_commands(commands=admin_menu, scope=types.BotCommandScopeChat(chat_id=os.getenv('CHAT_ID_ADMIN')))
 
     dp.include_routers(admin)

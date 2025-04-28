@@ -25,7 +25,7 @@ async def infoname_getter(dialog_manager: DialogManager, **kwargs):
 
 info_menu = Dialog(
     Window(
-        Const('🗺️ Информация по другому населенному пункту\n'),
+        Const('🗺️ Цены в другие населённые пункты\n'),
         List(
             Format("{pos}. {item[0]}"),
             items="info",

@@ -23,7 +23,9 @@ load_dotenv()
 # user_group_router.message.middleware(DriverActiveMiddleware())
 user_group_router.callback_query.middleware(DriverActiveMiddleware())
 
-
+@user_group_router.message(CommandStart())
+async def cmd_start(message: Message):
+    await message.answer(f'{message.chat.id}')
 @user_group_router.callback_query(F.data.startswith('accept_'))
 async def accept(callback: CallbackQuery, bot: Bot, state: FSMContext):
     try:
