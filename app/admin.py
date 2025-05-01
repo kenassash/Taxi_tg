@@ -659,10 +659,12 @@ class FreeOrder(StatesGroup):
     free_order_user = State()
     free_order_price = State()
 
+
 @admin.callback_query(IsAdmin(), F.data == 'freeorder')
 async def freeorder1(callback: CallbackQuery, state: FSMContext):
     await callback.answer('')
     await callback.message.answer('Действие 💤', reply_markup=await kb_admin.free_order_kb())
+
 
 @admin.callback_query(IsAdmin(), F.data == 'chn_freeorder')
 async def freeorder2(callback: CallbackQuery, state: FSMContext):
@@ -670,6 +672,7 @@ async def freeorder2(callback: CallbackQuery, state: FSMContext):
     await callback.message.answer('Введите цифру бесплатной поездки',
                                   reply_markup=await kb.cancel_order())
     await state.set_state(FreeOrder.free_order_price)
+
 
 @admin.message(IsAdmin(), FreeOrder.free_order_price, F.text)
 async def change_settings_value(message: Message, state: FSMContext):
@@ -683,6 +686,8 @@ async def change_settings_value(message: Message, state: FSMContext):
         await state.clear()
     else:
         await message.answer("Пожалуйста, введите только цифры.")
+
+
 @admin.callback_query(IsAdmin(), F.data == 'add_freeorder')
 async def freeorder2(callback: CallbackQuery, state: FSMContext):
     await callback.answer('')
