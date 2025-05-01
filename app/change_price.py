@@ -3,7 +3,7 @@ class Settings:
     time_rate = 10  # Цена за минуту
 
     fix_price = 30
-    free_ride = 10
+    free_ride = 11
 
     @classmethod
     def set_distance_rate(cls, value):

@@ -6,21 +6,68 @@ from app.database.requests import get_all_car, get_cities_inside, get_cities_out
     get_cities_routes1, get_cities_routes2
 
 
-async def admin_keyboard():
-    keyboard = InlineKeyboardBuilder()
-    keyboard.add(InlineKeyboardButton(text='Автомобили', callback_data='car_menu'))
-    keyboard.add(InlineKeyboardButton(text='Информация', callback_data='info'))
-    keyboard.add(InlineKeyboardButton(text='Рассылка', callback_data='newletter'))
-    keyboard.add(InlineKeyboardButton(text='Поменять цену', callback_data='change_settings'))
-    keyboard.add(InlineKeyboardButton(text='Пользователи', callback_data='number_passeger'))
-    keyboard.add(InlineKeyboardButton(text='Бан', callback_data='ban_user'))
-    keyboard.add(InlineKeyboardButton(text='Время сна', callback_data='time_restriction'))
-    keyboard.add(InlineKeyboardButton(text='Запрет водителю', callback_data='driver_block'))
-    keyboard.add(InlineKeyboardButton(text='Инф-ия о заказе', callback_data='info_order'))
-    keyboard.add(InlineKeyboardButton(text='Ночной тариф', callback_data='nightchange'))
-    keyboard.add(InlineKeyboardButton(text='Бесплатная поездка', callback_data='freeorder'))
-    keyboard.add(InlineKeyboardButton(text='Пополнить баланс водителю', callback_data='add_balance'))
-    return keyboard.adjust(2).as_markup()
+# async def admin_keyboard():
+#     keyboard = InlineKeyboardBuilder()
+#     keyboard.add(InlineKeyboardButton(text='Автомобили', callback_data='car_menu'))
+#     keyboard.add(InlineKeyboardButton(text='Информация', callback_data='info'))
+#     keyboard.add(InlineKeyboardButton(text='Рассылка', callback_data='newletter'))
+#     keyboard.add(InlineKeyboardButton(text='Поменять цену', callback_data='change_settings'))
+#     keyboard.add(InlineKeyboardButton(text='Пользователи', callback_data='number_passeger'))
+#     keyboard.add(InlineKeyboardButton(text='Бан', callback_data='ban_user'))
+#     keyboard.add(InlineKeyboardButton(text='Время сна', callback_data='time_restriction'))
+#     keyboard.add(InlineKeyboardButton(text='Запрет водителю', callback_data='driver_block'))
+#     keyboard.add(InlineKeyboardButton(text='Инф-ия о заказе', callback_data='info_order'))
+#     keyboard.add(InlineKeyboardButton(text='Ночной тариф', callback_data='nightchange'))
+#     keyboard.add(InlineKeyboardButton(text='Сделать бесплатную поздку', callback_data='freeorder'))
+#     keyboard.add(InlineKeyboardButton(text='Пополнить баланс водителю', callback_data='add_balance'))
+#     keyboard.add(InlineKeyboardButton(text='Автораспределение', callback_data='auto_distribution'))
+#     keyboard.add(InlineKeyboardButton(text='Вкл бесплатные поездки', callback_data='free_ride'))
+#     return keyboard.adjust(2).as_markup()
+
+def create_keyboard(
+        buttons: dict[str, str],
+        adjust: int
+) -> InlineKeyboardMarkup:
+    builder = InlineKeyboardBuilder()
+    for text, callback in buttons.items():
+        builder.button(
+            text=text,
+            callback_data=callback
+        )
+    builder.adjust(adjust)
+    return builder.as_markup()
+
+def admin_keyboard(
+        auto_distribution: bool = False,
+        free_ride: bool = False,
+) -> InlineKeyboardMarkup:
+    buttons = {
+        'Автомобили': 'car_menu',
+        'Информация': 'info',
+        'Рассылка': 'newletter',
+        'Поменять цену': 'change_settings',
+        'Пользователи': 'number_passeger',
+        'Бан': 'ban_user',
+        'Время сна': 'time_restriction',
+        'Запрет водителю': 'driver_block',
+        'Инф-ия о заказе': 'info_order',
+        'Ночной тариф': 'nightchange',
+        'Настройка бесплатных': 'freeorder',
+        'Пополнить баланс водителю': 'add_balance',
+        # "Автораспределение": "auto_distribution"
+    }
+    if auto_distribution:
+        buttons["Автораспределение(Вкл)"] = "auto_distribution"
+    else:
+        buttons["Автораспределение(Выкл)"] = "auto_distribution"
+    if free_ride:
+        buttons["Бесплатная поездка(Вкл)"] = "free_ride"
+    else:
+        buttons["Бесплатная поездка(Выкл)"] = "free_ride"
+    return create_keyboard(
+        buttons=buttons,
+        adjust=2
+    )
 
 
 async def turn_time_rest():
@@ -159,5 +206,12 @@ async def night_changekb():
     keyboard = InlineKeyboardBuilder()
     keyboard.add(InlineKeyboardButton(text='Включить', callback_data='nightchangekb_YES'))
     keyboard.add(InlineKeyboardButton(text='Отключить', callback_data='nightchangekb_NO'))
+    keyboard.add(InlineKeyboardButton(text='Отменить', callback_data=f'cancelorder_'))
+    return keyboard.adjust(2).as_markup()
+
+async def free_order_kb():
+    keyboard = InlineKeyboardBuilder()
+    keyboard.add(InlineKeyboardButton(text='Дать бп', callback_data='add_freeorder'))
+    keyboard.add(InlineKeyboardButton(text='Изменить цифру бп', callback_data='chn_freeorder'))
     keyboard.add(InlineKeyboardButton(text='Отменить', callback_data=f'cancelorder_'))
     return keyboard.adjust(2).as_markup()

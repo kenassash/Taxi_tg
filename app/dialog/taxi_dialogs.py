@@ -1,6 +1,7 @@
 import operator
 from operator import itemgetter
 
+from aiogram import F
 from aiogram_dialog import Dialog, DialogManager, Window
 from aiogram_dialog.widgets.input import TextInput
 from aiogram_dialog.widgets.kbd import (
@@ -34,7 +35,8 @@ from app.dialog.callbacks import (
     order_now,
     upprice_order,
     cancel_upprice, add_new_address_cb, on_choosen_add_address_cb, order_now_with_new_address1,
-    add_new_address1, add_new_address2, add_new_address_cb2, on_choosen_add_address_cb2, order_now_with_new_address2
+    add_new_address1, add_new_address2, add_new_address_cb2, on_choosen_add_address_cb2, order_now_with_new_address2,
+    get_info_by_driver_handler
 )
 from app.dialog.getters import (
     get_role_driver,
@@ -55,17 +57,23 @@ start_menu_order = Dialog(
         Button(Const('🚕СОЗДАТЬ ЗАКАЗ🚕'),
                id='start_order',
                on_click=start_order),
+        Button(
+            text=Const("Аккаунт"),
+            id="button_get_about_driver",
+            on_click=get_info_by_driver_handler,
+            when=F["is_driver"]
+        ),
         getter=get_role_driver,
-        state=StartOrder.driver,
-    ),
-    Window(
-        Format('{text}'),
-        Button(Const('🚕СОЗДАТЬ ЗАКАЗ🚕'),
-               id='start_order',
-               on_click=start_order),
-        getter=get_role_user,
         state=StartOrder.user,
     ),
+    # Window(
+    #     Format('{text}'),
+    #     Button(Const('🚕СОЗДАТЬ ЗАКАЗ🚕'),
+    #            id='start_order',
+    #            on_click=start_order),
+    #     getter=get_role_user,
+    #     state=StartOrder.user,
+    # ),
 )
 
 # Определение диалога

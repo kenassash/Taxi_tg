@@ -16,7 +16,7 @@ from app.database.requests import add_car, get_all_car, remove_car, print_all_on
     get_all_drivers_with_update_date, get_users, get_one_car, get_driver_info, reset_to_zero, update_car, \
     get_users_count, add_change_price, ban_user, get_ban_all_user, get_cities_routes_price, \
     get_cities_routes_price_update, no_active, get_all_orders, city_routers_update_all, save_free_ride_by_phone, \
-    update_driver
+    update_driver, get_settings, update_settings
 
 import app.keyboards as kb
 import app.kb.kb_admin as kb_admin
@@ -30,7 +30,6 @@ time_restriction_middleware_instance = TimeRestrictionMiddleware()
 router.message.middleware(time_restriction_middleware_instance)
 start_menu_dialog.callback_query.middleware(time_restriction_middleware_instance)
 start_menu_order.callback_query.middleware(time_restriction_middleware_instance)
-
 
 admin = Router()
 admin.message.filter(ChatTypeFilter(["private"]), IsAdmin())
@@ -55,7 +54,7 @@ async def admin_features(message: Message):
     # test = await get_info_online_tablo()
     # for i in test:
     #     await message.answer(i)
-    await message.answer("Что хотите сделать?", reply_markup=await kb_admin.admin_keyboard())
+    await message.answer("Что хотите сделать?", reply_markup=kb_admin.admin_keyboard())
 
 
 # ------------------информация о заказе---------
@@ -335,6 +334,7 @@ async def change_city_routers_all(message: Message, state: FSMContext):
     else:
         await message.answer("Пожалуйста, введите цифры со знаком + или -")
 
+
 # ---Изменить ценну в связке----
 @admin.callback_query(IsAdmin(), F.data.startswith('chroute_'))
 async def change_route_callback(callback: CallbackQuery, state: FSMContext):
@@ -595,6 +595,8 @@ async def send_user(message: Message, state: FSMContext, bot: Bot):
     else:
         await message.answer('Используй кнопку ответить на сообщение')
         await state.set_state(SendToUser.sendTouser)
+
+
 # автоматические изменение цены
 @admin.callback_query(IsAdmin(), F.data == 'nightchange')
 async def night_change_cb(callback: CallbackQuery):
@@ -613,27 +615,28 @@ async def stop_task(callback: CallbackQuery, apscheduler: AsyncIOScheduler):
     else:
         await callback.answer("Нет активной задачи для отключения.")
 
+
 @admin.callback_query(IsAdmin(), F.data.startswith('nightchangekb_'))
 async def night_change_kb(callback: CallbackQuery, bot: Bot, apscheduler: AsyncIOScheduler):
     await callback.answer('')
     answer = callback.data.split('_')[1]
 
-
     if answer == 'YES':
         try:
             apscheduler.add_job(city_routers_update_all,
-                trigger='cron',
-                hour=00,
-                id=f"set_night_price_{callback.from_user.id}",
-                args=['+50'],
-            )
+                                trigger='cron',
+                                hour=00,
+                                id=f"set_night_price_{callback.from_user.id}",
+                                args=['+50'],
+                                )
             apscheduler.add_job(city_routers_update_all,
-                trigger='cron',
-                hour=7,
-                id=f"set_day_price{callback.from_user.id}",
-                args=['-50'],
-            )
-            await callback.message.answer('Задача добавлена с 12 ночи до 7 - +50 рублей во всех связках\nЗадача добавлена с 7 утра до 12 - -50 рублей во всех связках')
+                                trigger='cron',
+                                hour=7,
+                                id=f"set_day_price{callback.from_user.id}",
+                                args=['-50'],
+                                )
+            await callback.message.answer(
+                'Задача добавлена с 12 ночи до 7 - +50 рублей во всех связках\nЗадача добавлена с 7 утра до 12 - -50 рублей во всех связках')
         except ConflictingIdError:
             await callback.message.answer('Задача добавлена с 12 ночи до 7 часов цена повышена во всех связка на ***')
             print('Ошибка запуска apscheduler.add_job')
@@ -650,18 +653,46 @@ async def night_change_kb(callback: CallbackQuery, bot: Bot, apscheduler: AsyncI
             await callback.message.answer("Задача успешно отключена!")
             print('Ошибка остановки apscheduler.add_job')
 
-# дать пользователю бесплатную поездку
+
+# Бесплатные поездки
 class FreeOrder(StatesGroup):
     free_order_user = State()
+    free_order_price = State()
+
 @admin.callback_query(IsAdmin(), F.data == 'freeorder')
-async def freeorder(callback: CallbackQuery, state: FSMContext):
+async def freeorder1(callback: CallbackQuery, state: FSMContext):
+    await callback.answer('')
+    await callback.message.answer('Действие 💤', reply_markup=await kb_admin.free_order_kb())
+
+@admin.callback_query(IsAdmin(), F.data == 'chn_freeorder')
+async def freeorder2(callback: CallbackQuery, state: FSMContext):
+    await callback.answer('')
+    await callback.message.answer('Введите цифру бесплатной поездки',
+                                  reply_markup=await kb.cancel_order())
+    await state.set_state(FreeOrder.free_order_price)
+
+@admin.message(IsAdmin(), FreeOrder.free_order_price, F.text)
+async def change_settings_value(message: Message, state: FSMContext):
+    input_int = message.text.strip()
+    pattern = r"^\d+$"
+    if re.match(pattern, input_int):
+        await state.update_data(free_price=message.text)
+        data = await state.get_data()
+        await update_settings(free_price=int(data['free_price']))
+        await message.answer(f'Цена успешна добавлена ')
+        await state.clear()
+    else:
+        await message.answer("Пожалуйста, введите только цифры.")
+@admin.callback_query(IsAdmin(), F.data == 'add_freeorder')
+async def freeorder2(callback: CallbackQuery, state: FSMContext):
     await callback.answer('')
     await callback.message.answer('Введите номер телефона кому предоставить бесплатную поездку\nПример: +79981662233',
                                   reply_markup=await kb.cancel_order())
     await state.set_state(FreeOrder.free_order_user)
 
+
 @admin.message(IsAdmin(), FreeOrder.free_order_user, F.text)
-async def ban_users3(message: Message, state: FSMContext, bot: Bot):
+async def freeorder3(message: Message, state: FSMContext, bot: Bot):
     input_int = message.text.strip()
     pattern = r"^\+7\d{10}$"
     if re.match(pattern, input_int):
@@ -681,14 +712,18 @@ async def ban_users3(message: Message, state: FSMContext, bot: Bot):
     else:
         await message.answer("Введите номер телефона  в формате +79991115577")
 
+
 # Пополнить баланс водителя
 class Add_balance(StatesGroup):
     add_balance = State()
+
+
 @admin.callback_query(IsAdmin(), F.data == 'add_balance')
 async def add_balance1(callback: CallbackQuery, state: FSMContext):
     await callback.answer('')
     await callback.message.answer('Выберите автомобиль',
                                   reply_markup=await kb_admin.add_balance())
+
 
 @admin.callback_query(IsAdmin(), F.data.startswith('addbalance_'))
 async def add_balance2(callback: CallbackQuery, bot: Bot, state: FSMContext):
@@ -706,6 +741,7 @@ async def add_balance2(callback: CallbackQuery, bot: Bot, state: FSMContext):
     await state.update_data(driver_id=driver_info.tg_id)
     await state.set_state(Add_balance.add_balance)
 
+
 @admin.message(IsAdmin(), Add_balance.add_balance, F.text)
 async def add_balance3(message: Message, state: FSMContext, bot: Bot):
     input_int = message.text.strip()
@@ -718,3 +754,41 @@ async def add_balance3(message: Message, state: FSMContext, bot: Bot):
         await state.clear()
     else:
         await message.answer("Пожалуйста, введите только цифры.")
+
+
+@admin.callback_query(IsAdmin(), F.data == "auto_distribution")
+async def change_settings(callback: CallbackQuery):
+    status = await get_settings()
+    if status.auto_distribution:
+        await callback.message.edit_text(
+            text=f"{callback.message.text.splitlines()[0]}\n\n"
+                 f"Автораспределение: Выключено",
+            reply_markup=kb_admin.admin_keyboard()
+        )
+        await update_settings(auto_distribution=False)
+    else:
+        await callback.message.edit_text(
+            text=f"{callback.message.text.splitlines()[0]}\n\n"
+                 f"Автораспределение: Включено",
+            reply_markup=kb_admin.admin_keyboard(auto_distribution=True)
+        )
+        await update_settings(auto_distribution=True)
+
+
+@admin.callback_query(IsAdmin(), F.data == "free_ride")
+async def change_settings(callback: CallbackQuery):
+    status = await get_settings()
+    if status.free_ride:
+        await callback.message.edit_text(
+            text=f"{callback.message.text.splitlines()[0]}\n\n"
+                 f"Бесплатная поездка: Выключено",
+            reply_markup=kb_admin.admin_keyboard(free_ride=False)
+        )
+        await update_settings(free_ride=False)
+    else:
+        await callback.message.edit_text(
+            text=f"{callback.message.text.splitlines()[0]}\n\n"
+                 f"Бесплатная поездка: Включено",
+            reply_markup=kb_admin.admin_keyboard(free_ride=True)
+        )
+        await update_settings(free_ride=True)

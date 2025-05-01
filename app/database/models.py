@@ -119,6 +119,15 @@ class CityRoutes(Base):
     city2: Mapped[str] = mapped_column(String(255), nullable=True)
     price: Mapped[int] = mapped_column(nullable=True)
 
+class SettingModel(Base):
+    __tablename__ = "settings"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    free_ride: Mapped[bool] = mapped_column(default=False)
+    free_price: Mapped[int] = mapped_column(nullable=True)
+    auto_distribution: Mapped[bool] = mapped_column(default=False)
+
+
 class OnlineExecution(Base):
     __tablename__ = 'order_executions'
 

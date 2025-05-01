@@ -1,3 +1,4 @@
+from aiogram.types import User
 from aiogram_dialog import DialogManager
 
 from app.change_price import Settings
@@ -8,23 +9,71 @@ from app.database.requests import (
     get_cities_outside,
     get_route_price,
     get_user,
-    get_cities_outside_name
+    get_cities_outside_name, get_settings, get_driver
 )
 
+async def get_role_driver(
+        dialog_manager: DialogManager,
+        event_from_user: User,
+        **kwargs
+) -> dict[str, str | bool]:
+    driver = await get_driver(dialog_manager.event.from_user.id)
+    user = await get_user(dialog_manager.event.from_user.id)
+    status = await get_settings()
+    try:
+        if driver:
+            text = f'<b>Добро пожаловать, Таксист {event_from_user.full_name}</b>😊\n\n'
+            dialog_manager.dialog_data["driver_info"] = driver
+            if status.free_ride:
+                if user.free_ride == 0:
+                    text += f'Поздравляем! У вас бесплатная поездка 🎉'
+                else:
+                    text += f'До бесплатной поездки осталось <b>{status.free_price - user.free_ride}</b>'
+                data = {'text': text, "is_driver": bool(driver)}
+                return data
+            data = {'text': text, "is_driver": bool(driver)}
+            return data
+        else:
+            text = f'<b>Добро пожаловать, {event_from_user.full_name}!</b> 😊\n\n'
+            if status.free_ride:
+                if user.free_ride == 0:
+                    text += f'Поздравляем! У вас бесплатная поездка 🎉'
+                else:
+                    text += f'До бесплатной поездки осталось <b>{status.free_price - user.free_ride}</b>'
+                data = {'text': text, "is_driver": bool(driver)}
+                return data
+            data = {'text': text, "is_driver": bool(driver)}
+            return data
 
-async def get_role_driver(dialog_manager: DialogManager, **kwargs):
-    driver = dialog_manager.middleware_data['driver']
-    text = f'<b>Добро пожаловать, Таксист {dialog_manager.event.from_user.full_name}</b>😊\n\n'
-    data = {'text': text}
-    return data
+    except KeyError:
+        text = f'Нажмите на кнопку'
+        data = {'text': text}
+        return data
+
+
+# async def get_role_driver(dialog_manager: DialogManager, **kwargs):
+#     driver = dialog_manager.middleware_data['driver']
+#     text = f'<b>Добро пожаловать, Таксист {dialog_manager.event.from_user.full_name}</b>😊\n\n'
+#     data = {'text': text}
+#     return data
 
 
 async def get_role_user(dialog_manager: DialogManager, **kwargs):
+    user = await get_user(dialog_manager.event.from_user.id)
+    status = await get_settings()
     try:
-        text = f'<b>Добро пожаловать, {dialog_manager.event.from_user.full_name}!</b> 😊\n\n' \
-            # f'До бесплатной поездки осталось <b>{Settings.free_ride - user.free_ride}</b>'
+        text = (f'<b>Добро пожаловать, {dialog_manager.event.from_user.full_name}!</b> 😊\n\n')
+        if status.free_ride:
+            if user.free_ride == 0:
+                text += f'Поздравляем! У вас бесплатная поездка 🎉'
+            else:
+                text += f'До бесплатной поездки осталось <b>{status.free_price - user.free_ride}</b>'
+            data = {'text': text}
+            return data
         data = {'text': text}
         return data
+
+
     except KeyError:
         text = f'Нажмите на кнопку'
         data = {'text': text}

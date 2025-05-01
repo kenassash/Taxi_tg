@@ -1,7 +1,9 @@
 from sqlalchemy.orm import joinedload, selectinload
 
-from app.database.models import User, Order, Driver, OnlineExecution, Base, CityOutside, CityInside, CityRoutes
+from app.database.models import User, Order, Driver, OnlineExecution, Base, CityOutside, CityInside, CityRoutes, \
+    SettingModel
 from app.database.models import async_session
+from typing import Any
 
 from sqlalchemy import select, update, delete, desc, or_, func
 
@@ -455,3 +457,14 @@ async def get_least_loaded_driver():
 
         )
         print(result.all())
+
+async def get_settings():
+    async with async_session() as session:
+    # await init_settings(session)
+        result = await session.scalar(select(SettingModel))
+        return result
+
+async def update_settings(**values: Any):
+    async with async_session() as session:
+        await session.execute(update(SettingModel).values(**values))
+        await session.commit()

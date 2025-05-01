@@ -8,7 +8,7 @@ from dotenv import load_dotenv
 from datetime import datetime, timedelta
 
 from app.database.requests import get_all_orders, get_driver, delete_order_execution, delete_order_pass, \
-    get_order_driver, save_free_ride, set_chat_id_driver, set_chat_id_user, update_driver
+    get_order_driver, save_free_ride, set_chat_id_driver, set_chat_id_user, update_driver, get_settings
 from filters.chat_type import ChatTypeFilter
 from app.change_price import Settings
 import app.keyboards as kb
@@ -58,7 +58,7 @@ async def close(callback: CallbackQuery, bot: Bot):
                                                 reply_markup=await kb.accept(order_id.id))
 
         await callback.message.edit_text(f'Вы отказались от заказа <b>№{order_id.id}</b>')
-        await update_driver(driver_id.tg_id, price=int(driver_id.price + int(driver_id.price * 0.10)))
+        await update_driver(driver_id.tg_id, price=int(driver_id.price + int(order_id.price * 0.10)))
 
         await set_chat_id_driver(order_id.id, message_id_pass.message_id)
         await set_chat_id_user(order_id.id, message_driver.message_id)
@@ -188,6 +188,7 @@ async def finish(callback: CallbackQuery, bot: Bot):
         await callback.answer('')
         order_id = await get_all_orders(callback.data.split('_')[1])
         driver_id = await get_driver(callback.from_user.id)
+        status = await get_settings()
         # message_id_pass = callback.data.split('_')[2]
         message_id_pass = order_id.chat_id_user
         # Проверяем что это был магазин
@@ -213,42 +214,61 @@ async def finish(callback: CallbackQuery, bot: Bot):
         # await delete_order_execution(order_id.id, driver_id.id)
         # Увеличиваем счетчик поездок
         # Бесплатные поездки
-        # user_free_ride = order_id.user_rel.free_ride
-        # user_free_ride += 1
-        # if user_free_ride == Settings.free_ride:
-        #     free_ride_count = 0  # Обнуляем счетчик после 10-й поездки
-        #     await save_free_ride(order_id.user_rel.tg_id, free_ride_count)
-        #     await bot.send_message(chat_id=order_id.user_rel.tg_id,
-        #                            text=f'Поздравляем! Ваша следующая поездка будет бесплатной! 🎉',
-        #                            reply_markup=await kb.main())
-        # else:
-        #     free_ride = user_free_ride
-        #     await save_free_ride(order_id.user_rel.tg_id, free_ride)
-        #     await bot.delete_message(chat_id=order_id.user_rel.tg_id, message_id=message_id_pass)
-        #     await bot.send_message(chat_id=order_id.user_rel.tg_id,
-        #                            text=f'Заказ выполнен✅.\n'
-        #                                 f'Спасибо что пользуетесь нашими услугами 🙏\n\n'
-        #                                 f'До бесплатной поездки осталось {Settings.free_ride - free_ride}',
-        #                            reply_markup=await kb.main())
-
-        # Бесплатные поездки
         user_free_ride = order_id.user_rel.free_ride
-        if user_free_ride == 0:
-            free_ride = 1
-            await save_free_ride(order_id.user_rel.tg_id, free_ride)
-        try:
-            # удаляю сообщение у пользователя
-            await bot.delete_message(chat_id=order_id.user_rel.tg_id, message_id=message_id_pass)
-        except TelegramBadRequest as e:
-            if "message to delete not found" in str(e):
-                # Логирование или обработка конкретного случая, если сообщение не найдено
-                print("Сообщение уже удалено или не найдено.")
+        if status.free_ride:
+
+            user_free_ride += 1
+            if user_free_ride == status.free_price:
+                free_ride_count = 0  # Обнуляем счетчик после 10-й поездки
+                await save_free_ride(order_id.user_rel.tg_id, free_ride_count)
+                try:
+                    # удаляю сообщение у пользователя
+                    await bot.delete_message(chat_id=order_id.user_rel.tg_id, message_id=message_id_pass)
+                except TelegramBadRequest as e:
+                    if "message to delete not found" in str(e):
+                        # Логирование или обработка конкретного случая, если сообщение не найдено
+                        print("Сообщение уже удалено или не найдено.")
+                    else:
+                        raise e
+                await bot.send_message(chat_id=order_id.user_rel.tg_id,
+                                       text=f'Поздравляем! Ваша следующая поездка будет бесплатной! 🎉',
+                                       reply_markup=await kb.main())
             else:
-                raise e
-        await bot.send_message(chat_id=order_id.user_rel.tg_id,
-                               text=f'Заказ выполнен✅.\n'
-                                    f'Спасибо что пользуетесь нашими услугами 🙏\n\n',
-                               reply_markup=await kb.main())
+                free_ride = user_free_ride
+                await save_free_ride(order_id.user_rel.tg_id, free_ride)
+                try:
+                    # удаляю сообщение у пользователя
+                    await bot.delete_message(chat_id=order_id.user_rel.tg_id, message_id=message_id_pass)
+                except TelegramBadRequest as e:
+                    if "message to delete not found" in str(e):
+                        # Логирование или обработка конкретного случая, если сообщение не найдено
+                        print("Сообщение уже удалено или не найдено.")
+                    else:
+                        raise e
+                await bot.send_message(chat_id=order_id.user_rel.tg_id,
+                                       text=f'Заказ выполнен✅.\n'
+                                            f'Спасибо что пользуетесь нашими услугами 🙏\n\n'
+                                            f'До бесплатной поездки осталось {status.free_price - free_ride}',
+                                       reply_markup=await kb.main())
+
+        # Бесплатные поездки выключены
+        else:
+            if user_free_ride == 0:
+                free_ride = 1
+                await save_free_ride(order_id.user_rel.tg_id, free_ride)
+            try:
+                # удаляю сообщение у пользователя
+                await bot.delete_message(chat_id=order_id.user_rel.tg_id, message_id=message_id_pass)
+            except TelegramBadRequest as e:
+                if "message to delete not found" in str(e):
+                    # Логирование или обработка конкретного случая, если сообщение не найдено
+                    print("Сообщение уже удалено или не найдено.")
+                else:
+                    raise e
+            await bot.send_message(chat_id=order_id.user_rel.tg_id,
+                                   text=f'Заказ выполнен✅.\n'
+                                        f'Спасибо что пользуетесь нашими услугами 🙏\n\n',
+                                   reply_markup=await kb.main())
 
         await callback.message.delete()
     except AttributeError:
