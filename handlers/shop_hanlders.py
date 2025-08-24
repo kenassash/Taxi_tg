@@ -106,4 +106,4 @@ async def shop_point_end_addres(message: Message, state: FSMContext, bot: Bot):
         await state.clear()
         # await state.update_data(message_id=sent_message.message_id)
     else:
-        await message.answer("Пожалуйста, введите только цифры.")
+        await message.answer("Пожалуйста, введите только цифры.") 

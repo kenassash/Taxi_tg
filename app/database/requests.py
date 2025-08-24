@@ -124,11 +124,12 @@ async def shop_order_add(user_id, price):
         return order.id
 
 
-async def save_free_ride(tg_id, free_ride):
+async def save_free_ride(tg_id, free_ride, paid_free_bool: bool):
     async with async_session() as session:
         await session.execute(update(User)
                               .where(User.tg_id == tg_id)
-                              .values(free_ride=free_ride))
+                              .values(free_ride=free_ride,
+                                      paid_free=paid_free_bool))
         await session.commit()
 
 async def save_free_ride_by_phone(phone, free_ride):
@@ -458,13 +459,85 @@ async def get_least_loaded_driver():
         )
         print(result.all())
 
+
+async def get_all_active_drivers():
+    """Получает всех активных водителей"""
+    async with async_session() as session:
+        result = await session.execute(
+            select(Driver).where(Driver.active == True)
+        )
+        return result.scalars().all()
+
+
+async def send_order_to_all_drivers(bot, order_id: int, text_order: str, reply_markup):
+    """Отправляет заказ всем активным водителям в личные чаты"""
+    try:
+        drivers = await get_all_active_drivers()
+        sent_messages = []
+        
+        for driver in drivers:
+            try:
+                message = await bot.send_message(
+                    chat_id=driver.tg_id,
+                    text=f"🚨 НОВЫЙ ЗАКАЗ 🚨\n\n{text_order}",
+                    reply_markup=reply_markup
+                )
+                sent_messages.append({
+                    'driver_id': driver.id,
+                    'message_id': message.message_id,
+                    'chat_id': driver.tg_id
+                })
+            except Exception as e:
+                print(f"Ошибка отправки заказа водителю {driver.id}: {e}")
+                continue
+        
+        return sent_messages
+    except Exception as e:
+        print(f"Ошибка в send_order_to_all_drivers: {e}")
+        return []
+
+
+async def is_auto_distribution_enabled():
+    """Проверяет, включено ли автораспределение заказов"""
+    try:
+        settings = await get_settings()
+        return settings.auto_distribution if settings else False
+    except Exception as e:
+        print(f"Ошибка при проверке настроек автораспределения: {e}")
+        return False
+
+
+async def init_settings(session):
+    """Инициализирует настройки по умолчанию, если их нет в базе"""
+    try:
+        existing_settings = await session.scalar(select(SettingModel))
+        if not existing_settings:
+            default_settings = SettingModel(
+                free_ride=False,
+                free_price=0,
+                auto_distribution=False
+            )
+            session.add(default_settings)
+            await session.commit()
+            print("Настройки инициализированы по умолчанию")
+    except Exception as e:
+        print(f"Ошибка при инициализации настроек: {e}")
+
+
 async def get_settings():
     async with async_session() as session:
-    # await init_settings(session)
+        await init_settings(session)
         result = await session.scalar(select(SettingModel))
         return result
 
 async def update_settings(**values: Any):
     async with async_session() as session:
         await session.execute(update(SettingModel).values(**values))
+        await session.commit()
+
+async def update_users(tg_id: int, **values: Any):
+    async with async_session() as session:
+        await session.execute(update(User)
+                              .where(User.tg_id == tg_id)
+                              .values(**values))
         await session.commit()

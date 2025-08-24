@@ -62,6 +62,23 @@
 ![Скриншот Админ панель](https://github.com/kenassash/Taxi_tg/blob/master/img/5.png)
 ![Скриншот Информация о заказе](https://github.com/kenassash/Taxi_tg/blob/master/img/6.png)
 
+Уникальность таблицы сделать секвенцию:
+Найди имя последовательности:
+
+sql
+Копировать
+Редактировать
+SELECT pg_get_serial_sequence('city_routes', 'id');
+Пример ответа: 'city_routes_id_seq'
+
+Сбрось значение последовательности на максимум текущих id:
+
+sql
+Копировать
+Редактировать
+SELECT setval('city_routes_id_seq', (SELECT MAX(id) FROM city_routes));
+
+
 Работа с alembic
 
 alembic revision --autogenerate -m "add price to settings"

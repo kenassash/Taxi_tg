@@ -4,7 +4,7 @@ from aiogram import Bot
 from aiogram.types import CallbackQuery, Message
 from aiogram_dialog import DialogManager, StartMode, ShowMode
 from aiogram_dialog.widgets.input import ManagedTextInput
-from aiogram_dialog.widgets.kbd import Button, Multiselect, Select, ManagedMultiselect
+from aiogram_dialog.widgets.kbd import Button, Multiselect, Select, ManagedMultiselect, ManagedRadio
 
 from app.database.requests import (
     get_all_orders,
@@ -13,9 +13,9 @@ from app.database.requests import (
     get_user,
     set_order,
     set_chat_id_user,
-    up_price_passager, get_least_loaded_driver
+    up_price_passager, get_least_loaded_driver, update_users
 )
-from app.dialog.states import AddOrder
+from app.dialog.states import AddOrder, StartOrder
 import app.keyboards as kb
 
 
@@ -47,6 +47,16 @@ async def get_info_by_driver_handler(
         caption=text_driver
     )
 
+async def on_paid_free_selected(
+    callback: CallbackQuery,
+    widget: ManagedRadio,
+    dialog_manager: DialogManager,
+    item_id: str
+):
+    dialog_manager.dialog_data["paid_free_selected"] = True
+    await update_users(dialog_manager.event.from_user.id, paid_free_value=str(item_id))
+    await dialog_manager.switch_to(StartOrder.user)
+
 
 async def cancel_in_start(callback: CallbackQuery, widget: Button, dialog_manager: DialogManager):
     await callback.message.delete()
@@ -62,23 +72,6 @@ async def commit(event: CallbackQuery,
     if not dialog_manager.dialog_data['selected_items']:
         dialog_manager.dialog_data.pop('selected_items', None)
 
-    # # Получаем список выбранных элементов
-    # selected_items = dialog_manager.dialog_data.get('selected_items', set())
-    #
-    # # Проверяем, выбран ли уже элемент
-    # if item_id in selected_items:
-    #     # Если элемент уже выбран, убираем его
-    #     selected_items.remove(item_id)
-    # else:
-    #     # Если элемент не выбран, добавляем его
-    #     selected_items.add(item_id)
-    #
-    # # Сохраняем обновленный список выбранных элементов в dialog_data
-    # if not selected_items:
-    #     dialog_manager.dialog_data.pop('selected_items', None)
-    # else:
-    #     # Иначе, сохраняем обновленный список выбранных элементов в dialog_data
-    #     dialog_manager.dialog_data['selected_items'] = selected_items
 
 
 async def cancel_upprice(callback: CallbackQuery, widget: Button, dialog_manager: DialogManager):
@@ -281,6 +274,7 @@ async def start_order(callback: CallbackQuery,
     if not user:
         await callback.message.answer('Пройдите повторно регистрацию. Нажмите /start')
         return
+
     await dialog_manager.start(AddOrder.city1, mode=StartMode.RESET_STACK)
 
 

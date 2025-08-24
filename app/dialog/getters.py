@@ -17,6 +17,10 @@ async def get_role_driver(
         event_from_user: User,
         **kwargs
 ) -> dict[str, str | bool]:
+    paid_free_items = [
+        ("Платно", '1'),
+        ("Бесплатно", '2'),
+    ]
     driver = await get_driver(dialog_manager.event.from_user.id)
     user = await get_user(dialog_manager.event.from_user.id)
     status = await get_settings()
@@ -29,7 +33,13 @@ async def get_role_driver(
                     text += f'Поздравляем! У вас бесплатная поездка 🎉'
                 else:
                     text += f'До бесплатной поездки осталось <b>{status.free_price - user.free_ride}</b>'
-                data = {'text': text, "is_driver": bool(driver)}
+                data = {'text': text,
+                        "is_driver": bool(driver),
+                        "paid_free_items": paid_free_items,
+                        "paid_free": bool(user.paid_free),
+                        "paid_free_selected": dialog_manager.dialog_data.get("paid_free_selected", False),
+                        }
+                print(dialog_manager.dialog_data)
                 return data
             data = {'text': text, "is_driver": bool(driver)}
             return data
@@ -40,7 +50,12 @@ async def get_role_driver(
                     text += f'Поздравляем! У вас бесплатная поездка 🎉'
                 else:
                     text += f'До бесплатной поездки осталось <b>{status.free_price - user.free_ride}</b>'
-                data = {'text': text, "is_driver": bool(driver)}
+                data = {'text': text,
+                        "is_driver": bool(driver),
+                        "paid_free_items": paid_free_items,
+                        "paid_free_selected": dialog_manager.dialog_data.get("paid_free_selected", False),
+                        }
+                print(dialog_manager.dialog_data)
                 return data
             data = {'text': text, "is_driver": bool(driver)}
             return data
@@ -220,6 +235,7 @@ async def get_order(dialog_manager: DialogManager, **kwargs):
     another2_id = dialog_manager.dialog_data.get('another2_id')
 
     selected_items = dialog_manager.dialog_data.get('selected_items')
+    # Получаем платную или бесплатную поездку
 
     price = 0
     price_route = 0
@@ -230,7 +246,7 @@ async def get_order(dialog_manager: DialogManager, **kwargs):
         price = await get_route_price(city1_id, city2_id)
         data_hide = {'another_hide': True}
         # Бесплатные поездки
-        if user_id.free_ride == 0:
+        if user_id.free_ride == 0 and user_id.paid_free_value == '2':
             price_route += price
             price = 0
 
@@ -254,7 +270,7 @@ async def get_order(dialog_manager: DialogManager, **kwargs):
         # цена умножается
         price *= 2
         # Бесплатные поездки
-        if user_id.free_ride == 0:
+        if user_id.free_ride == 0 and user_id.paid_free_value == '2':
             price = price_route
         # Выведет: "Туда-обратно"
         dialog_manager.dialog_data['add_address'] = topics[0][0]

@@ -4,11 +4,13 @@ from aiogram.exceptions import TelegramBadRequest
 from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, Message
+from aiogram_dialog import DialogManager, StartMode
 from dotenv import load_dotenv
 from datetime import datetime, timedelta
 
 from app.database.requests import get_all_orders, get_driver, delete_order_execution, delete_order_pass, \
     get_order_driver, save_free_ride, set_chat_id_driver, set_chat_id_user, update_driver, get_settings
+from app.dialog.states import StartOrder
 from filters.chat_type import ChatTypeFilter
 from app.change_price import Settings
 import app.keyboards as kb
@@ -183,12 +185,13 @@ async def on_the_spot(callback: CallbackQuery, bot: Bot):
 
 
 @driver_router.callback_query(F.data.startswith('finish_'))
-async def finish(callback: CallbackQuery, bot: Bot):
+async def finish(callback: CallbackQuery, bot: Bot, dialog_manager: DialogManager):
     try:
         await callback.answer('')
         order_id = await get_all_orders(callback.data.split('_')[1])
         driver_id = await get_driver(callback.from_user.id)
         status = await get_settings()
+        bg_manager = dialog_manager.bg(user_id=order_id.user_rel.tg_id)
         # message_id_pass = callback.data.split('_')[2]
         message_id_pass = order_id.chat_id_user
         # Проверяем что это был магазин
@@ -210,17 +213,25 @@ async def finish(callback: CallbackQuery, bot: Bot):
                                    text=f'Заказ выполнен✅.\n',
                                    reply_markup=await kb_sh.shop_order())
             return
-        # Удаляем запись запись о начале выполнения заказа
+        # Удаляем запись о начале выполнения заказа
         # await delete_order_execution(order_id.id, driver_id.id)
         # Увеличиваем счетчик поездок
         # Бесплатные поездки
         user_free_ride = order_id.user_rel.free_ride
+        active_paid_free = order_id.user_rel.paid_free
+        paid_free_value = order_id.user_rel.paid_free_value
+
         if status.free_ride:
 
             user_free_ride += 1
-            if user_free_ride == status.free_price:
-                free_ride_count = 0  # Обнуляем счетчик после 10-й поездки
-                await save_free_ride(order_id.user_rel.tg_id, free_ride_count)
+            if user_free_ride >= status.free_price or paid_free_value == '1':
+                # Обнуляем счетчик после 10-й поездки
+                free_ride_count = 0
+                # ставим в таблице ноль и активурем paid_free = true
+                await save_free_ride(order_id.user_rel.tg_id,
+                                     free_ride_count,
+                                     paid_free_bool=True)  # ставим в таблице ноль и активурем paid_free = true
+
                 try:
                     # удаляю сообщение у пользователя
                     await bot.delete_message(chat_id=order_id.user_rel.tg_id, message_id=message_id_pass)
@@ -230,12 +241,19 @@ async def finish(callback: CallbackQuery, bot: Bot):
                         print("Сообщение уже удалено или не найдено.")
                     else:
                         raise e
-                await bot.send_message(chat_id=order_id.user_rel.tg_id,
-                                       text=f'Поздравляем! Ваша следующая поездка будет бесплатной! 🎉',
-                                       reply_markup=await kb.main())
+                # await bot.send_message(chat_id=order_id.user_rel.tg_id,
+                #                        text=f'Поздравляем! Ваша следующая поездка будет бесплатной! 🎉',
+                #                        reply_markup=await kb.main())
+
+                await bg_manager.start(
+                    state=StartOrder.user,  # важно!
+                    data={"text": "🎉 Поздравляем! Ваша следующая поездка будет бесплатной!"},
+                    # это будет в Format('{text}')
+                    mode=StartMode.RESET_STACK,
+                )
             else:
                 free_ride = user_free_ride
-                await save_free_ride(order_id.user_rel.tg_id, free_ride)
+                await save_free_ride(order_id.user_rel.tg_id, free_ride, paid_free_bool=False)
                 try:
                     # удаляю сообщение у пользователя
                     await bot.delete_message(chat_id=order_id.user_rel.tg_id, message_id=message_id_pass)
@@ -245,17 +263,26 @@ async def finish(callback: CallbackQuery, bot: Bot):
                         print("Сообщение уже удалено или не найдено.")
                     else:
                         raise e
-                await bot.send_message(chat_id=order_id.user_rel.tg_id,
-                                       text=f'Заказ выполнен✅.\n'
-                                            f'Спасибо что пользуетесь нашими услугами 🙏\n\n'
-                                            f'До бесплатной поездки осталось {status.free_price - free_ride}',
-                                       reply_markup=await kb.main())
+                # await bot.send_message(chat_id=order_id.user_rel.tg_id,
+                #                        text=f'Заказ выполнен✅.\n'
+                #                             f'Спасибо что пользуетесь нашими услугами 🙏\n\n'
+                #                             f'До бесплатной поездки осталось {status.free_price - free_ride}',
+                #                        reply_markup=await kb.main())
+                text_driver = (f"Заказ выполнен✅.\n"
+                               f"Спасибо что пользуетесь нашими услугами 🙏\n\n"
+                               f"До бесплатной поездки осталось {status.free_price - free_ride}")
+                await bg_manager.start(
+                    state=StartOrder.user,  # важно!
+                    data={"text": text_driver},
+                    # это будет в Format('{text}')
+                    mode=StartMode.RESET_STACK,
+                )
 
         # Бесплатные поездки выключены
         else:
-            if user_free_ride == 0:
+            if user_free_ride == 0 or paid_free_value == '2':
                 free_ride = 1
-                await save_free_ride(order_id.user_rel.tg_id, free_ride)
+                await save_free_ride(order_id.user_rel.tg_id, free_ride, paid_free_bool=False)
             try:
                 # удаляю сообщение у пользователя
                 await bot.delete_message(chat_id=order_id.user_rel.tg_id, message_id=message_id_pass)
@@ -265,10 +292,19 @@ async def finish(callback: CallbackQuery, bot: Bot):
                     print("Сообщение уже удалено или не найдено.")
                 else:
                     raise e
-            await bot.send_message(chat_id=order_id.user_rel.tg_id,
-                                   text=f'Заказ выполнен✅.\n'
-                                        f'Спасибо что пользуетесь нашими услугами 🙏\n\n',
-                                   reply_markup=await kb.main())
+            # await bot.send_message(chat_id=order_id.user_rel.tg_id,
+            #                        text=f'Заказ выполнен✅.\n'
+            #                             f'Спасибо что пользуетесь нашими услугами 🙏\n\n',
+            #                        reply_markup=await kb.main())
+            text_driver = (f'Заказ выполнен✅.\n'
+                           f'Спасибо что пользуетесь нашими услугами 🙏\n\n')
+            await bg_manager.start(
+                state=StartOrder.user,  # важно!
+                data={"text": text_driver},
+                # это будет в Format('{text}')
+                mode=StartMode.RESET_STACK
+            )
+
 
         await callback.message.delete()
     except AttributeError:

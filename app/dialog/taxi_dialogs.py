@@ -16,7 +16,7 @@ from aiogram_dialog.widgets.kbd import (
     Start,
     Group,
     SwitchTo,
-    Multiselect, PrevPage, NextPage
+    Multiselect, PrevPage, NextPage, Radio
 )
 from aiogram_dialog.widgets.text import Const, Format, Multi
 from app.dialog.callbacks import (
@@ -36,7 +36,7 @@ from app.dialog.callbacks import (
     upprice_order,
     cancel_upprice, add_new_address_cb, on_choosen_add_address_cb, order_now_with_new_address1,
     add_new_address1, add_new_address2, add_new_address_cb2, on_choosen_add_address_cb2, order_now_with_new_address2,
-    get_info_by_driver_handler
+    get_info_by_driver_handler, on_paid_free_selected
 )
 from app.dialog.getters import (
     get_role_driver,
@@ -56,7 +56,18 @@ start_menu_order = Dialog(
         Format('{text}'),
         Button(Const('🚕СОЗДАТЬ ЗАКАЗ🚕'),
                id='start_order',
-               on_click=start_order),
+               on_click=start_order,
+               when=((~F["paid_free"]) | F["paid_free_selected"])
+               ),
+        Radio(
+            Format("✓ {item[0]}"),
+            Format("  {item[0]}"),
+            id="free_id",
+            item_id_getter=operator.itemgetter(1),
+            items="paid_free_items",
+            when=F["paid_free"],
+            on_state_changed=on_paid_free_selected,
+        ),
         Button(
             text=Const("Аккаунт"),
             id="button_get_about_driver",
@@ -66,14 +77,6 @@ start_menu_order = Dialog(
         getter=get_role_driver,
         state=StartOrder.user,
     ),
-    # Window(
-    #     Format('{text}'),
-    #     Button(Const('🚕СОЗДАТЬ ЗАКАЗ🚕'),
-    #            id='start_order',
-    #            on_click=start_order),
-    #     getter=get_role_user,
-    #     state=StartOrder.user,
-    # ),
 )
 
 # Определение диалога
