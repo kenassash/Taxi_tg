@@ -12,6 +12,7 @@ from app.database.requests import (
     get_cities_outside_name, get_settings, get_driver
 )
 
+
 async def get_role_driver(
         dialog_manager: DialogManager,
         event_from_user: User,
@@ -21,48 +22,85 @@ async def get_role_driver(
         ("Платно", '1'),
         ("Бесплатно", '2'),
     ]
+    driver_status_items = [
+        ("🟢 Активен", 'active'),
+        ("🔴 Неактивен", 'inactive'),
+    ]
+
     driver = await get_driver(dialog_manager.event.from_user.id)
     user = await get_user(dialog_manager.event.from_user.id)
     status = await get_settings()
+
     try:
         if driver:
             text = f'<b>Добро пожаловать, Таксист {event_from_user.full_name}</b>😊\n\n'
             dialog_manager.dialog_data["driver_info"] = driver
+
             if status.free_ride:
                 if user.free_ride == 0:
                     text += f'Поздравляем! У вас бесплатная поездка 🎉'
                 else:
                     text += f'До бесплатной поездки осталось <b>{status.free_price - user.free_ride}</b>'
-                data = {'text': text,
-                        "is_driver": bool(driver),
-                        "paid_free_items": paid_free_items,
-                        "paid_free": bool(user.paid_free),
-                        "paid_free_selected": dialog_manager.dialog_data.get("paid_free_selected", False),
-                        }
+
+                data = {
+                    'text': text,
+                    "is_driver": bool(driver),
+                    "paid_free_items": paid_free_items,
+                    "paid_free": bool(user.paid_free),  # ✅ Для водителей
+                    "paid_free_selected": dialog_manager.dialog_data.get("paid_free_selected", False),
+                    "driver_status_items": driver_status_items,
+                    "driver_active": driver.active,
+                }
                 print(dialog_manager.dialog_data)
                 return data
-            data = {'text': text, "is_driver": bool(driver)}
+
+            data = {
+                'text': text,
+                "is_driver": bool(driver),
+                "driver_status_items": driver_status_items,
+                "driver_active": driver.active
+            }
             return data
+
         else:
+            # Обычные пользователи (не водители)
             text = f'<b>Добро пожаловать, {event_from_user.full_name}!</b> 😊\n\n'
+
             if status.free_ride:
                 if user.free_ride == 0:
                     text += f'Поздравляем! У вас бесплатная поездка 🎉'
                 else:
                     text += f'До бесплатной поездки осталось <b>{status.free_price - user.free_ride}</b>'
-                data = {'text': text,
-                        "is_driver": bool(driver),
-                        "paid_free_items": paid_free_items,
-                        "paid_free_selected": dialog_manager.dialog_data.get("paid_free_selected", False),
-                        }
+
+                data = {
+                    'text': text,
+                    "is_driver": bool(driver),
+                    "paid_free_items": paid_free_items,
+                    "paid_free": bool(user.paid_free),  # ✅ Добавил для пользователей
+                    "paid_free_selected": dialog_manager.dialog_data.get("paid_free_selected", False),
+                    "driver_status_items": driver_status_items,
+                    "driver_active": False,
+                }
                 print(dialog_manager.dialog_data)
                 return data
-            data = {'text': text, "is_driver": bool(driver)}
+
+            data = {
+                'text': text,
+                "is_driver": bool(driver),
+                "paid_free_items": paid_free_items,  # ✅ Добавил
+                "paid_free": bool(user.paid_free),  # ✅ Добавил
+                "driver_status_items": driver_status_items,
+                "driver_active": False
+            }
             return data
 
     except KeyError:
         text = f'Нажмите на кнопку'
-        data = {'text': text}
+        data = {
+            'text': text,
+            "paid_free_items": paid_free_items,  # ✅ Добавил
+            "paid_free": False,  # ✅ Добавил
+        }
         return data
 
 
@@ -132,33 +170,21 @@ async def get_upprice(dialog_manager: DialogManager, **kwargs):
     data["price"] = order_data.price
 
     return data
-    # if dialog_manager.dialog_data.get('add_address'):
-    #     data = {
-    #         "city1_id": order_data.city1_id,
-    #         "city2_id": order_data.city2_id,
-    #         "address1_id": order_data.address1_id,
-    #         "address2_id": order_data.address2_id,
-    #         "add_address": dialog_manager.dialog_data.get('add_address'),
-    #         "price": order_data.price,
-    #         'first_show': True,
-    #     }
-    #     return data
-    #
-    # data = {
-    #     "city1_id": order_data.city1_id,
-    #     "city2_id": order_data.city2_id,
-    #     "address1_id": order_data.address1_id,
-    #     "address2_id": order_data.address2_id,
-    #     "price": order_data.price,
-    #     'first_show': False,
-    # }
-    # return data
+
+
+def _allow_another_locality(user) -> bool:
+    """Показывать ли выбор другого населенного пункта."""
+    if not user:
+        return True
+    return not (user.free_ride == 0 and user.paid_free_value == '2')
 
 
 async def get_city_inside1(dialog_manager: DialogManager, **kwargs, ):
     cities = await get_cities_inside()
+    user = await get_user(dialog_manager.event.from_user.id)
     data = {
         'city_inside1': cities,
+        'allow_another': _allow_another_locality(user),
     }
     return data
 
@@ -169,11 +195,15 @@ async def get_city_inside2(dialog_manager: DialogManager, **kwargs, ):
     city1_id = dialog_manager.dialog_data.get('city1_id')
     another_id = dialog_manager.dialog_data.get('another1_id')
 
+    user = await get_user(dialog_manager.event.from_user.id)
+    allow_another = _allow_another_locality(user)
+
     if city1_id:
         data = {
             'city1_id': city1_id,
             'address1_id': adress1_id,
             'city_inside2': cities,
+            'allow_another': allow_another,
         }
         return data
     else:
@@ -181,6 +211,7 @@ async def get_city_inside2(dialog_manager: DialogManager, **kwargs, ):
             'city1_id': another_id,
             'address1_id': adress1_id,
             'city_inside2': cities,
+            'allow_another': allow_another,
         }
         return data
 

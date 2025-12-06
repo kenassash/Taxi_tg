@@ -36,7 +36,7 @@ from app.dialog.callbacks import (
     upprice_order,
     cancel_upprice, add_new_address_cb, on_choosen_add_address_cb, order_now_with_new_address1,
     add_new_address1, add_new_address2, add_new_address_cb2, on_choosen_add_address_cb2, order_now_with_new_address2,
-    get_info_by_driver_handler, on_paid_free_selected
+    get_info_by_driver_handler, on_paid_free_selected, on_driver_status_changed
 )
 from app.dialog.getters import (
     get_role_driver,
@@ -68,6 +68,15 @@ start_menu_order = Dialog(
             when=F["paid_free"],
             on_state_changed=on_paid_free_selected,
         ),
+        Radio(
+            Format("✓ {item[0]}"),
+            Format("  {item[0]}"),
+            id="driver_status_id",
+            item_id_getter=operator.itemgetter(1),
+            items="driver_status_items",
+            when=F["is_driver"],  # Показываем только водителям
+            on_state_changed=on_driver_status_changed,  # Нужно создать эту функцию
+        ),
         Button(
             text=Const("Аккаунт"),
             id="button_get_about_driver",
@@ -95,6 +104,7 @@ start_menu_dialog = Dialog(
                 Const(text="Другой населенный пункт"),
                 id='another_locality1',
                 on_click=on_choosen_another_state,
+                when='allow_another',
             ),
             id='city_from_input_ids1',
             width=2,
@@ -162,7 +172,8 @@ start_menu_dialog = Dialog(
             ),
             Button(Const(text="Другой населенный пункт"),
                    id='another_locality2',
-                   on_click=on_choosen_another_state2),
+                   on_click=on_choosen_another_state2,
+                   when='allow_another'),
             id='city_from_input_ids2',
             width=2,
         ),

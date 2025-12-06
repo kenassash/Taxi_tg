@@ -1,6 +1,7 @@
 import os
 
 from aiogram import Router, F
+from aiogram.exceptions import TelegramBadRequest
 from aiogram.types import Message, CallbackQuery, ReplyKeyboardRemove
 from aiogram.filters import CommandStart, or_f, Command
 from aiogram.fsm.context import FSMContext
@@ -133,7 +134,13 @@ async def delete_order_passager(callback: CallbackQuery, bot: Bot, state: FSMCon
                                     text=f"Заказ <code>{driver_id.id}</code>\n"
                                          f"<b>❌Пассажир отменил заказ</b>\n\n"
                                          f"Телефон <b>{driver_id.user_rel.phone}</b>")
-        await callback.message.delete()
+        try:
+            await callback.message.delete()
+        except TelegramBadRequest as e:
+            if "message to delete not found" not in str(e):
+                print(f"Ошибка при удалении сообщения: {e}")
+
+        # Отправляем подтверждение отмены
         await callback.message.answer(f'Заказ отменен')
         await state.clear()
         return

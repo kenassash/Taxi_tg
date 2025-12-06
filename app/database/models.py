@@ -1,7 +1,7 @@
 import os
 from typing import List
 
-from sqlalchemy import BigInteger, ForeignKey, String, DateTime, func, Boolean
+from sqlalchemy import BigInteger, ForeignKey, String, DateTime, func, Boolean, Integer
 from sqlalchemy.orm import Mapped, mapped_column, relationship, DeclarativeBase
 from sqlalchemy.ext.asyncio import AsyncAttrs, async_sessionmaker, create_async_engine
 from app.database import Base
@@ -74,6 +74,7 @@ class Order(Base):
 
     chat_id_user: Mapped[str] = mapped_column(String(100), nullable=True)
     chat_id_driver: Mapped[str] = mapped_column(String(100), nullable=True)
+    driver_id: Mapped[str] = mapped_column(String(100), nullable=True)
 
     drivers_reply: Mapped[List['Driver']] = relationship(back_populates='orders_reply',
                                                          secondary='order_executions')
@@ -93,6 +94,7 @@ class Driver(Base):
     price: Mapped[int] = mapped_column(nullable=True)
 
     active: Mapped[bool] = mapped_column(Boolean, default=True)
+    order_count: Mapped[bool] = mapped_column(Boolean, nullable=True)  # Счетчик заказов
 
     orders_reply: Mapped[List['Order']] = relationship(back_populates='drivers_reply',
                                                        secondary='order_executions')

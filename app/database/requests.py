@@ -103,6 +103,7 @@ async def city_routers_update_all(price_delta: str):
         )
         await session.execute(price)
         await session.commit()
+
 async def set_order(user_id, data):
     user_id = int(user_id)
     async with async_session() as session:
@@ -141,12 +142,13 @@ async def save_free_ride_by_phone(phone, free_ride):
         await session.commit()
         tg_id = result.scalar()  # scalar() возвращает одну строку
         return tg_id
-async def get_all_orders(id):
-    id = int(id)
+
+async def get_all_orders(order_id_id):
+    order_id_id = int(order_id_id)
     async with async_session() as session:
         # result = await session.scalar(select(Order).where(Order.id == id))
         result = await session.scalar(select(Order)
-                                      .where(Order.id == id)
+                                      .where(Order.id == order_id_id)
                                       .options(joinedload(Order.user_rel)))
         return result
 
@@ -345,10 +347,10 @@ async def up_price_passager(order_id, price_passager):
         await session.refresh(order_instance)
         return order_instance
 
-async def set_chat_id_user(order_id, chat_id_driverid):
-    chat_id_driverid = str(chat_id_driverid)
+async def set_chat_id_user(order_id, **kwargs):
+    # chat_id_driverid = str(chat_id_driverid)
     async with async_session() as session:
-        query = update(Order).where(Order.id == order_id).values(chat_id_driver=chat_id_driverid)
+        query = update(Order).where(Order.id == order_id).values(**kwargs)
         await session.execute(query)
         await session.commit()
 
@@ -446,6 +448,15 @@ async def get_route_price(city1: str, city2: str):
         route = result.scalar_one_or_none()
         return route.price if route else None
 
+async def get_all_active_drivers():
+    async with async_session() as session:
+        result = await session.execute(
+            select(Driver).where(Driver.active == True)
+        )
+        if result:
+            return result.scalars().all()
+        return None
+
 async def get_least_loaded_driver():
     async with async_session() as session:
         """Получает водителя с наименьшим количеством заказов"""
@@ -459,74 +470,9 @@ async def get_least_loaded_driver():
         )
         print(result.all())
 
-
-async def get_all_active_drivers():
-    """Получает всех активных водителей"""
-    async with async_session() as session:
-        result = await session.execute(
-            select(Driver).where(Driver.active == True)
-        )
-        return result.scalars().all()
-
-
-async def send_order_to_all_drivers(bot, order_id: int, text_order: str, reply_markup):
-    """Отправляет заказ всем активным водителям в личные чаты"""
-    try:
-        drivers = await get_all_active_drivers()
-        sent_messages = []
-        
-        for driver in drivers:
-            try:
-                message = await bot.send_message(
-                    chat_id=driver.tg_id,
-                    text=f"🚨 НОВЫЙ ЗАКАЗ 🚨\n\n{text_order}",
-                    reply_markup=reply_markup
-                )
-                sent_messages.append({
-                    'driver_id': driver.id,
-                    'message_id': message.message_id,
-                    'chat_id': driver.tg_id
-                })
-            except Exception as e:
-                print(f"Ошибка отправки заказа водителю {driver.id}: {e}")
-                continue
-        
-        return sent_messages
-    except Exception as e:
-        print(f"Ошибка в send_order_to_all_drivers: {e}")
-        return []
-
-
-async def is_auto_distribution_enabled():
-    """Проверяет, включено ли автораспределение заказов"""
-    try:
-        settings = await get_settings()
-        return settings.auto_distribution if settings else False
-    except Exception as e:
-        print(f"Ошибка при проверке настроек автораспределения: {e}")
-        return False
-
-
-async def init_settings(session):
-    """Инициализирует настройки по умолчанию, если их нет в базе"""
-    try:
-        existing_settings = await session.scalar(select(SettingModel))
-        if not existing_settings:
-            default_settings = SettingModel(
-                free_ride=False,
-                free_price=0,
-                auto_distribution=False
-            )
-            session.add(default_settings)
-            await session.commit()
-            print("Настройки инициализированы по умолчанию")
-    except Exception as e:
-        print(f"Ошибка при инициализации настроек: {e}")
-
-
 async def get_settings():
     async with async_session() as session:
-        await init_settings(session)
+    # await init_settings(session)
         result = await session.scalar(select(SettingModel))
         return result
 
@@ -540,4 +486,60 @@ async def update_users(tg_id: int, **values: Any):
         await session.execute(update(User)
                               .where(User.tg_id == tg_id)
                               .values(**values))
+        await session.commit()
+
+async def get_next_available_driver():
+    """Получить следующего доступного водителя по счетчику"""
+    async with async_session() as session:
+        # Получаем водителя с False (не получал заказ) или NULL
+        query = select(Driver).where(
+            Driver.active == True,
+            (Driver.order_count == False) | (Driver.order_count == None)
+        ).order_by(Driver.id.asc())
+        
+        result = await session.execute(query)
+        driver = result.scalars().first()
+        return driver
+
+async def increment_driver_order_count(driver_id: int):
+    """Пометить водителя как получившего заказ"""
+    async with async_session() as session:
+        query = update(Driver).where(
+            Driver.tg_id == driver_id
+        ).values(order_count=True)
+        await session.execute(query)
+        await session.commit()
+
+async def reset_all_driver_counts():
+    """Сбросить счетчики всех водителей в False"""
+    async with async_session() as session:
+        query = update(Driver).values(order_count=False)
+        await session.execute(query)
+        await session.commit()
+
+async def check_and_reset_if_needed():
+    """Проверить, нужно ли сбросить счетчики"""
+    async with async_session() as session:
+        # Проверяем, есть ли водители с False (не получали заказ)
+        query = select(Driver).where(
+            Driver.active == True,
+            (Driver.order_count == False) | (Driver.order_count == None)
+        )
+        result = await session.execute(query)
+        available_drivers = result.scalars().all()
+        
+        # Если нет доступных водителей (все True), сбрасываем
+        if not available_drivers:
+            await reset_all_driver_counts()
+            print("Счетчики всех водителей сброшены")
+            return True
+        return False
+
+async def mark_driver_inactive(driver_id: int):
+    """Пометить водителя как неактивного"""
+    async with async_session() as session:
+        query = update(Driver).where(
+            Driver.tg_id == driver_id
+        ).values(active=False)
+        await session.execute(query)
         await session.commit()

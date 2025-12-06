@@ -50,7 +50,7 @@ async def shop_price(callback: CallbackQuery, state: FSMContext, bot: Bot):
                                                f"Цена: <b>{price}Р</b>",
                                           reply_markup=await kb.accept(order_id))
     await set_chat_id_driver(order_data.id, sent_driver_message.message_id)
-    await set_chat_id_user(order_data.id, sent_message.message_id)
+    await set_chat_id_user(order_data.id, chat_id_driver=str(sent_message.message_id))
     await state.clear()
     # await state.update_data(message_id=sent_message.message_id)
 
@@ -101,7 +101,7 @@ async def shop_point_end_addres(message: Message, state: FSMContext, bot: Bot):
                                                    f"Цена: <b>{data['price']}Р</b>",
                                               reply_markup=await kb.accept(order_id))
         await set_chat_id_driver(order_id, sent_driver_message.message_id)
-        await set_chat_id_user(order_id, sent_message.message_id)
+        await set_chat_id_user(order_id, chat_id_driver=str(sent_message.message_id))
 
         await state.clear()
         # await state.update_data(message_id=sent_message.message_id)

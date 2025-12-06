@@ -63,7 +63,7 @@ async def close(callback: CallbackQuery, bot: Bot):
         await update_driver(driver_id.tg_id, price=int(driver_id.price + int(order_id.price * 0.10)))
 
         await set_chat_id_driver(order_id.id, message_id_pass.message_id)
-        await set_chat_id_user(order_id.id, message_driver.message_id)
+        await set_chat_id_user(order_id.id, chat_id_driver=str(message_driver.message_id))
 
         await bot.edit_message_reply_markup(
             chat_id=order_id.user_rel.tg_id,
@@ -122,7 +122,7 @@ async def timewait(callback: CallbackQuery, bot: Bot):
                                                                                                message_pass.message_id))
         # reply_markup = await kb.close_and_finish(order_id.id)
         await set_chat_id_driver(order_id.id, message_pass.message_id)
-        await set_chat_id_user(order_id.id, message_driver.message_id)
+        await set_chat_id_user(order_id.id, chat_id_driver=str(message_driver.message_id))
 
         await bot.edit_message_reply_markup(
             chat_id=order_id.user_rel.tg_id,
@@ -173,7 +173,7 @@ async def on_the_spot(callback: CallbackQuery, bot: Bot):
                                                           reply_markup=await kb.close_and_finish(order_id.id,
                                                                                                  message_pass.message_id))
         await set_chat_id_driver(order_id.id, message_pass.message_id)
-        await set_chat_id_user(order_id.id, message_driver.message_id)
+        await set_chat_id_user(order_id.id, chat_id_driver=str(message_driver.message_id))
 
         await bot.edit_message_reply_markup(
             chat_id=order_id.user_rel.tg_id,
@@ -241,16 +241,16 @@ async def finish(callback: CallbackQuery, bot: Bot, dialog_manager: DialogManage
                         print("Сообщение уже удалено или не найдено.")
                     else:
                         raise e
-                # await bot.send_message(chat_id=order_id.user_rel.tg_id,
-                #                        text=f'Поздравляем! Ваша следующая поездка будет бесплатной! 🎉',
-                #                        reply_markup=await kb.main())
+                await bot.send_message(chat_id=order_id.user_rel.tg_id,
+                                       text=f'Поздравляем! Ваша следующая поездка будет бесплатной! 🎉',
+                                       reply_markup=await kb.main())
 
-                await bg_manager.start(
-                    state=StartOrder.user,  # важно!
-                    data={"text": "🎉 Поздравляем! Ваша следующая поездка будет бесплатной!"},
-                    # это будет в Format('{text}')
-                    mode=StartMode.RESET_STACK,
-                )
+                # await bg_manager.start(
+                #     state=StartOrder.user,  # важно!
+                #     data={"text": "🎉 Поздравляем! Ваша следующая поездка будет бесплатной!"},
+                #     # это будет в Format('{text}')
+                #     mode=StartMode.RESET_STACK,
+                # )
             else:
                 free_ride = user_free_ride
                 await save_free_ride(order_id.user_rel.tg_id, free_ride, paid_free_bool=False)
@@ -263,20 +263,20 @@ async def finish(callback: CallbackQuery, bot: Bot, dialog_manager: DialogManage
                         print("Сообщение уже удалено или не найдено.")
                     else:
                         raise e
-                # await bot.send_message(chat_id=order_id.user_rel.tg_id,
-                #                        text=f'Заказ выполнен✅.\n'
-                #                             f'Спасибо что пользуетесь нашими услугами 🙏\n\n'
-                #                             f'До бесплатной поездки осталось {status.free_price - free_ride}',
-                #                        reply_markup=await kb.main())
-                text_driver = (f"Заказ выполнен✅.\n"
-                               f"Спасибо что пользуетесь нашими услугами 🙏\n\n"
-                               f"До бесплатной поездки осталось {status.free_price - free_ride}")
-                await bg_manager.start(
-                    state=StartOrder.user,  # важно!
-                    data={"text": text_driver},
-                    # это будет в Format('{text}')
-                    mode=StartMode.RESET_STACK,
-                )
+                await bot.send_message(chat_id=order_id.user_rel.tg_id,
+                                       text=f'Заказ выполнен✅.\n'
+                                            f'Спасибо что пользуетесь нашими услугами 🙏\n\n'
+                                            f'До бесплатной поездки осталось {status.free_price - free_ride}',
+                                       reply_markup=await kb.main())
+                # text_driver = (f"Заказ выполнен✅.\n"
+                #                f"Спасибо что пользуетесь нашими услугами 🙏\n\n"
+                #                f"До бесплатной поездки осталось {status.free_price - free_ride}")
+                # await bg_manager.start(
+                #     state=StartOrder.user,  # важно!
+                #     data={"text": text_driver},
+                #     # это будет в Format('{text}')
+                #     mode=StartMode.RESET_STACK,
+                # )
 
         # Бесплатные поездки выключены
         else:
@@ -292,18 +292,18 @@ async def finish(callback: CallbackQuery, bot: Bot, dialog_manager: DialogManage
                     print("Сообщение уже удалено или не найдено.")
                 else:
                     raise e
-            # await bot.send_message(chat_id=order_id.user_rel.tg_id,
-            #                        text=f'Заказ выполнен✅.\n'
-            #                             f'Спасибо что пользуетесь нашими услугами 🙏\n\n',
-            #                        reply_markup=await kb.main())
-            text_driver = (f'Заказ выполнен✅.\n'
-                           f'Спасибо что пользуетесь нашими услугами 🙏\n\n')
-            await bg_manager.start(
-                state=StartOrder.user,  # важно!
-                data={"text": text_driver},
-                # это будет в Format('{text}')
-                mode=StartMode.RESET_STACK
-            )
+            await bot.send_message(chat_id=order_id.user_rel.tg_id,
+                                   text=f'Заказ выполнен✅.\n'
+                                        f'Спасибо что пользуетесь нашими услугами 🙏\n\n',
+                                   reply_markup=await kb.main())
+            # text_driver = (f'Заказ выполнен✅.\n'
+            #                f'Спасибо что пользуетесь нашими услугами 🙏\n\n')
+            # await bg_manager.start(
+            #     state=StartOrder.user,  # важно!
+            #     data={"text": text_driver},
+            #     # это будет в Format('{text}')
+            #     mode=StartMode.RESET_STACK
+            # )
 
 
         await callback.message.delete()

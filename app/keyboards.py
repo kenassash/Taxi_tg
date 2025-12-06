@@ -60,6 +60,18 @@ async def accept(order_id):
     keyboard.add(InlineKeyboardButton(text='Принять заказ', callback_data=f'accept_{order_id}'))
     return keyboard.adjust().as_markup()
 
+async def accept_or_skip(order_id: int) -> InlineKeyboardMarkup:
+        keyboard = InlineKeyboardBuilder()
+        keyboard.button(
+            text='Принять заказ',
+            callback_data=f'accept_{order_id}'
+        )
+        keyboard.button(
+            text="Пропустить",
+            callback_data=f"skip_{order_id}"
+        )
+        return keyboard.as_markup()
+
 
 async def close_and_finish(order_id, messege_id):
     keyboard = InlineKeyboardBuilder()

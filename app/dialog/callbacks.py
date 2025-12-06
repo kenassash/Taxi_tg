@@ -1,10 +1,13 @@
 import os
 
 from aiogram import Bot
+from aiogram.exceptions import TelegramBadRequest
+from aiogram.fsm.context import FSMContext
+from aiogram.fsm.storage.base import StorageKey
 from aiogram.types import CallbackQuery, Message
 from aiogram_dialog import DialogManager, StartMode, ShowMode
 from aiogram_dialog.widgets.input import ManagedTextInput
-from aiogram_dialog.widgets.kbd import Button, Multiselect, Select, ManagedMultiselect, ManagedRadio
+from aiogram_dialog.widgets.kbd import Button, Multiselect, Select, ManagedMultiselect, ManagedRadio, Radio
 
 from app.database.requests import (
     get_all_orders,
@@ -13,7 +16,9 @@ from app.database.requests import (
     get_user,
     set_order,
     set_chat_id_user,
-    up_price_passager, get_least_loaded_driver, update_users
+    up_price_passager, get_least_loaded_driver, update_users, get_settings, get_all_active_drivers,
+    get_next_available_driver, increment_driver_order_count, check_and_reset_if_needed, mark_driver_inactive,
+    update_driver
 )
 from app.dialog.states import AddOrder, StartOrder
 import app.keyboards as kb
@@ -34,7 +39,7 @@ async def get_info_by_driver_handler(
     text_driver = (
         f"Здравствуйте, {driver.name}\n\n"
         f"<b>Автомобиль: </b>{driver.car_name}, {driver.number_car}\n"
-        # f"<b>Статус: </b>{status_text}\n"
+        f"<b>Статус: </b>{status_text}\n"
         f"<b>Телефон: </b>{driver.phone}\n"
         f"<b>Баланс</b> {driver.price}\n\n"
         # f"<b>Бонусы</b> {driver.price}\n\n"
@@ -58,6 +63,26 @@ async def on_paid_free_selected(
     await dialog_manager.switch_to(StartOrder.user)
 
 
+async def on_driver_status_changed(
+        callback: CallbackQuery,
+        widget: Radio,
+        dialog_manager: DialogManager,
+        item_id: str
+):
+    """Обработчик изменения статуса водителя"""
+    driver_id = callback.from_user.id
+
+    # Обновляем статус водителя в базе
+    if item_id == 'active':
+        await update_driver(driver_id, active=True)
+        await callback.answer("Водитель активирован!")
+    elif item_id == 'inactive':
+        await update_driver(driver_id, active=False)
+        await callback.answer("Водитель деактивирован!")
+
+    # Обновляем данные в dialog_manager
+    dialog_manager.dialog_data["driver_status_changed"] = True
+
 async def cancel_in_start(callback: CallbackQuery, widget: Button, dialog_manager: DialogManager):
     await callback.message.delete()
     await callback.message.answer('Вы отменили. Нажмите /start что бы продолжить')
@@ -78,15 +103,17 @@ async def cancel_upprice(callback: CallbackQuery, widget: Button, dialog_manager
     await callback.message.delete()
     order_id_id = dialog_manager.dialog_data.get('order_id')
     order_data = await get_all_orders(order_id_id)
-    await dialog_manager.event.bot.edit_message_text(chat_id=os.getenv('CHAT_GROUP_ID'),
-                                                     message_id=order_data.chat_id_driver,
-                                                     text=f"<b>❌Пассажир отменил заказ</b>\n\n"
-                                                     # f"Заказ <b>{order_data.id}</b>\n\n"
-                                                          f"Телефон <b>{order_data.user_rel.phone}</b>")
-    # f"Начальная точка: <b>{order_data.city1_id} - {order_data.address1_id}</b>\n\n"
-    # f"Конечная точка: <b>{order_data.city2_id} - {order_data.address2_id}</b>\n\n"
-    # f"Цена: <b>{order_data.price}Р</b>\n\n")
-
+    auto_distribution = await get_settings()
+    if auto_distribution.auto_distribution:
+        await dialog_manager.event.bot.edit_message_text(chat_id=order_data.driver_id,
+                                                         message_id=order_data.chat_id_driver,
+                                                         text=f"<b>❌Пассажир отменил заказ</b>\n\n"
+                                                              f"Телефон <b>{order_data.user_rel.phone}</b>")
+    else:
+        await dialog_manager.event.bot.edit_message_text(chat_id=os.getenv('CHAT_GROUP_ID'),
+                                                         message_id=order_data.chat_id_driver,
+                                                         text=f"<b>❌Пассажир отменил заказ</b>\n\n"
+                                                              f"Телефон <b>{order_data.user_rel.phone}</b>")
     await dialog_manager.event.message.answer('Вы отменили. Нажмите /start что бы продолжить')
 
 
@@ -194,8 +221,11 @@ async def on_choosen_another_state2(callback: CallbackQuery,
 async def order_now(callback: CallbackQuery,
                     widget: Button,
                     dialog_manager: DialogManager):
+    bot: Bot = dialog_manager.middleware_data["bot"]
+    state: FSMContext = dialog_manager.middleware_data["state"]
+
     # dialog_manager = BgManager(user=user, chat=chat, bot=<bot>, router=<router>, intent_id=None, stack_id="")
-    # bg = dialog_manager.bg(None, os.getenv('CHAT_GROUP_ID'))
+    bg = dialog_manager.bg(None, os.getenv('CHAT_GROUP_ID'))
     another1_id = dialog_manager.dialog_data.get('another1_id')
     another2_id = dialog_manager.dialog_data.get('another2_id')
     if another1_id is not None:
@@ -226,18 +256,73 @@ async def order_now(callback: CallbackQuery,
         text_order += f"🔃<b>{order_data.add_address}</b>\n\n"
     text_order += f"Цена: <b>{order_data.price}Р</b>"
 
-    # await bg.start(data=data_test, mode=StartMode.NORMAL, state=AddOrder.upprice)
-    await get_least_loaded_driver()
-    message_id_driver = await dialog_manager.event.bot.send_message(chat_id=os.getenv('CHAT_GROUP_ID'),
-                                                                    text=text_order,
-                                                                    reply_markup=await kb.accept(order_id))
-    #
+    auto_distribution = await get_settings()
+    if auto_distribution.auto_distribution:
+        # Проверяем, нужно ли сбросить статусы заказов
+        await check_and_reset_if_needed()
+        
+        # Получаем следующего доступного водителя по статусу заказа
+        next_driver = await get_next_available_driver()
+        
+        if not next_driver:
+            await callback.answer(
+                "В данный момент нет свободных водителей.",
+                show_alert=True
+            )
+            return
+
+        print(f"Следующий водитель: {next_driver.tg_id}")
+        print(f"Статус заказа: {'Получал заказ' if next_driver.order_count else 'Не получал заказ'}")
+
+        # Пытаемся отправить заказ водителю
+        try:
+            message_id_driver = await bot.send_message(
+                chat_id=next_driver.tg_id,  
+                text=text_order,
+                reply_markup=await kb.accept_or_skip(order_id)
+            )
+            
+            # Помечаем водителя как получившего заказ
+            await increment_driver_order_count(next_driver.tg_id)
+            
+            print(f"Заказ {order_id} отправлен водителю {next_driver.tg_id}")
+            print(f"Водитель помечен как получивший заказ")
+            
+        except TelegramBadRequest as e:
+            if "chat not found" in str(e).lower():
+                print(f"Водитель {next_driver.tg_id} заблокировал бота")
+                # Помечаем водителя как неактивного
+                await mark_driver_inactive(next_driver.tg_id)
+                await callback.answer(
+                    "Водитель недоступен. Попробуйте позже.",
+                    show_alert=True
+                )
+                return
+            else:
+                raise e
+
+        # Сохраняем в базу
+        await set_chat_id_user(order_id, driver_id=str(next_driver.tg_id), chat_id_driver=str(message_id_driver.message_id))
+    else:
+        dialog_manager.dialog_data.clear()
+        dialog_manager.dialog_data['order_id'] = order_id
+        print(data_test)
+        # await bg.start(data=data_test, mode=StartMode.NORMAL, state=AddOrder.upprice)
+        test = await get_least_loaded_driver()
+        message_id_driver = await dialog_manager.event.bot.send_message(
+            chat_id=os.getenv('CHAT_GROUP_ID'),
+            text=text_order,
+            reply_markup=await kb.accept(order_id)
+
+        )
+        await set_chat_id_user(order_id, chat_id_driver=str(message_id_driver.message_id))
+
     # Очищаем dialog_data, но сохраняем контекст
     dialog_manager.dialog_data.clear()
     dialog_manager.dialog_data['order_id'] = order_id
     # dialog_manager.dialog_data['add_address'] = order_data.add_address
     # запись в бд massage_id
-    await set_chat_id_user(order_id, message_id_driver.message_id)
+    # await set_chat_id_user(order_id, chat_id_driver=str(message_id_driver.message_id))
     await dialog_manager.switch_to(state=AddOrder.upprice)
 
 
@@ -258,11 +343,17 @@ async def upprice_order(callback: CallbackQuery,
     if order_id.add_new_address2:
         text_order += f"📍:<b>{order_id.add_new_address2} - {order_id.add_street_address2.upper()}</b>\n\n"
     text_order += f"Цена: <b>{order_id.price}Р</b>"
-
-    await dialog_manager.event.bot.edit_message_text(chat_id=os.getenv('CHAT_GROUP_ID'),
-                                                     message_id=order_id.chat_id_driver,
-                                                     text=text_order,
-                                                     reply_markup=await kb.accept(order_id.id))
+    auto_distribution = await get_settings()
+    if auto_distribution.auto_distribution:
+        await dialog_manager.event.bot.edit_message_text(chat_id=order_id.driver_id,
+                                                         message_id=order_id.chat_id_driver,
+                                                         text=text_order,
+                                                         reply_markup=await kb.accept(order_id.id))
+    else:
+        await dialog_manager.event.bot.edit_message_text(chat_id=os.getenv('CHAT_GROUP_ID'),
+                                                         message_id=order_id.chat_id_driver,
+                                                         text=text_order,
+                                                         reply_markup=await kb.accept(order_id.id))
     await dialog_manager.switch_to(state=AddOrder.upprice)
 
 
@@ -313,7 +404,7 @@ async def order_now_with_new_address1(callback: CallbackQuery,
     dialog_manager.dialog_data.clear()
     dialog_manager.dialog_data['order_id'] = order_id
     # запись в бд massage_id
-    await set_chat_id_user(order_id, message_id_driver.message_id)
+    await set_chat_id_user(order_id, chat_id_driver=str(message_id_driver.message_id))
     await dialog_manager.switch_to(state=AddOrder.upprice)
 
 
@@ -341,5 +432,5 @@ async def order_now_with_new_address2(callback: CallbackQuery,
     dialog_manager.dialog_data.clear()
     dialog_manager.dialog_data['order_id'] = order_id
     # запись в бд massage_id
-    await set_chat_id_user(order_id, message_id_driver.message_id)
+    await set_chat_id_user(order_id, chat_id_driver=str(message_id_driver.message_id))
     await dialog_manager.switch_to(state=AddOrder.upprice)
