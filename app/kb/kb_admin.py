@@ -208,12 +208,56 @@ async def night_changekb():
     keyboard = InlineKeyboardBuilder()
     keyboard.add(InlineKeyboardButton(text='Включить', callback_data='nightchangekb_YES'))
     keyboard.add(InlineKeyboardButton(text='Отключить', callback_data='nightchangekb_NO'))
+    keyboard.add(InlineKeyboardButton(text='Настроить время', callback_data='night_tariff_set_time'))
+    keyboard.add(InlineKeyboardButton(text='Настроить сумму', callback_data='night_tariff_set_price'))
     keyboard.add(InlineKeyboardButton(text='Отменить', callback_data=f'cancelorder_'))
     return keyboard.adjust(2).as_markup()
+
+async def night_tariff_time_kb():
+    """Клавиатура для настройки времени ночного тарифа"""
+    keyboard = InlineKeyboardBuilder()
+    keyboard.add(InlineKeyboardButton(text='Изменить час начала', callback_data='night_tariff_set_start_hour'))
+    keyboard.add(InlineKeyboardButton(text='Изменить минуту начала', callback_data='night_tariff_set_start_minute'))
+    keyboard.add(InlineKeyboardButton(text='Изменить час окончания', callback_data='night_tariff_set_end_hour'))
+    keyboard.add(InlineKeyboardButton(text='Изменить минуту окончания', callback_data='night_tariff_set_end_minute'))
+    keyboard.add(InlineKeyboardButton(text='Назад', callback_data='nightchange'))
+    return keyboard.adjust(1).as_markup()
 
 async def free_order_kb():
     keyboard = InlineKeyboardBuilder()
     keyboard.add(InlineKeyboardButton(text='Дать бп', callback_data='add_freeorder'))
     keyboard.add(InlineKeyboardButton(text='Изменить цифру бп', callback_data='chn_freeorder'))
+    keyboard.add(InlineKeyboardButton(text='Выбрать города для БП', callback_data='free_ride_select_cities'))
     keyboard.add(InlineKeyboardButton(text='Отменить', callback_data=f'cancelorder_'))
     return keyboard.adjust(2).as_markup()
+
+async def free_ride_cities_kb(selected_city_ids: list[int] | None = None):
+    """Клавиатура для выбора городов доступных при бесплатной поездке"""
+    from app.database.requests import get_settings
+    from app.database.requests import get_cities_inside
+    
+    if selected_city_ids is None:
+        settings = await get_settings()
+        selected_city_ids = settings.free_ride_allowed_cities if settings and settings.free_ride_allowed_cities else []
+    
+    # Преобразуем в set для быстрой проверки
+    selected_city_ids_set = set(selected_city_ids) if selected_city_ids else set()
+    cities = await get_cities_inside()
+    
+    keyboard = InlineKeyboardBuilder()
+    
+    for city in cities:
+        if city.id in selected_city_ids_set:
+            text = f"✓ {city.city_name}"
+        else:
+            text = f"  {city.city_name}"
+        keyboard.add(InlineKeyboardButton(
+            text=text,
+            callback_data=f'toggle_free_city_{city.id}'
+        ))
+    
+    keyboard.add(InlineKeyboardButton(text='Сохранить', callback_data='save_free_cities'))
+    keyboard.add(InlineKeyboardButton(text='Назад', callback_data='freeorder'))
+    
+    keyboard.adjust(1)
+    return keyboard.as_markup()

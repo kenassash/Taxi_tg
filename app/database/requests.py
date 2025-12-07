@@ -94,15 +94,19 @@ async def get_cities_routes_price_update(city1: str, city2: str, price: int):
         await session.commit()
 
 async def city_routers_update_all(price_delta: str):
+    """Обновить цены во всех связках на указанную дельту"""
     price_delta = int(price_delta)
     async with async_session() as session:
+        # Обновляем только те записи, где price не None
         price = (
             update(CityRoutes)
+            .where(CityRoutes.price.isnot(None))
             .values(price=CityRoutes.price + price_delta)
             .execution_options(synchronize_session="fetch")
         )
         await session.execute(price)
         await session.commit()
+        print(f"Обновлены цены во всех связках на {price_delta} рублей")
 
 async def set_order(user_id, data):
     user_id = int(user_id)
@@ -480,6 +484,31 @@ async def update_settings(**values: Any):
     async with async_session() as session:
         await session.execute(update(SettingModel).values(**values))
         await session.commit()
+
+
+async def adjust_user_free_ride_counters(new_free_price: int):
+    """
+    Корректирует счетчики пользователей при изменении free_price.
+    Если новый порог меньше старого, пользователи с счетчиком >= нового порога
+    получают счетчик = 1 (чтобы не уходили в минус).
+    """
+    async with async_session() as session:
+        # Находим всех пользователей, у которых free_ride >= new_free_price
+        users_to_update = await session.scalars(
+            select(User).where(User.free_ride >= new_free_price)
+        )
+        users_list = users_to_update.all()
+        
+        # Обновляем счетчики для всех найденных пользователей - устанавливаем в 1
+        for user in users_list:
+            await session.execute(
+                update(User)
+                .where(User.id == user.id)
+                .values(free_ride=1)
+            )
+        
+        await session.commit()
+        return len(users_list)
 
 async def update_users(tg_id: int, **values: Any):
     async with async_session() as session:

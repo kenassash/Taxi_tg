@@ -40,6 +40,7 @@ async def main():
 
     dp.include_routers(admin)
     dp.callback_query.middleware(SchedulerMiddleware(scheduler))
+    dp.message.middleware(SchedulerMiddleware(scheduler))  # Добавляем middleware и для message
     dp.include_routers(*routers_list)
     dp.include_routers(start_menu_order, start_menu_dialog)
     dp.include_routers(info_menu)

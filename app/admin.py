@@ -16,7 +16,7 @@ from app.database.requests import add_car, get_all_car, remove_car, print_all_on
     get_all_drivers_with_update_date, get_users, get_one_car, get_driver_info, reset_to_zero, update_car, \
     get_users_count, add_change_price, ban_user, get_ban_all_user, get_cities_routes_price, \
     get_cities_routes_price_update, no_active, get_all_orders, city_routers_update_all, save_free_ride_by_phone, \
-    update_driver, get_settings, update_settings
+    update_driver, get_settings, update_settings, adjust_user_free_ride_counters
 
 import app.keyboards as kb
 import app.kb.kb_admin as kb_admin
@@ -621,29 +621,73 @@ async def night_change_kb(callback: CallbackQuery, bot: Bot, apscheduler: AsyncI
     await callback.answer('')
     answer = callback.data.split('_')[1]
 
+    # Получаем время и сумму из настроек
+    settings = await get_settings()
+    if not settings:
+        await callback.message.answer('Ошибка: настройки не найдены')
+        return
+    
+    start_hour = settings.night_tariff_start_hour if settings.night_tariff_start_hour is not None else 0
+    start_minute = settings.night_tariff_start_minute if settings.night_tariff_start_minute is not None else 0
+    end_hour = settings.night_tariff_end_hour if settings.night_tariff_end_hour is not None else 7
+    end_minute = settings.night_tariff_end_minute if settings.night_tariff_end_minute is not None else 0
+    tariff_price = settings.night_tariff_price if settings.night_tariff_price is not None else 50
+    
+    print(f'Настройки из БД: начало {start_hour:02d}:{start_minute:02d}, окончание {end_hour:02d}:{end_minute:02d}, цена {tariff_price}')
+
     if answer == 'YES':
         try:
+            # Удаляем старые задачи, если они есть (используем фиксированные глобальные ID)
+            job_id1 = "set_night_price_global"
+            job_id2 = "set_day_price_global"
+            try:
+                apscheduler.remove_job(job_id1)
+                apscheduler.remove_job(job_id2)
+            except JobLookupError:
+                pass  # Задачи могут не существовать
+            
+            # Добавляем новые задачи с временем и суммой из БД
             apscheduler.add_job(city_routers_update_all,
                                 trigger='cron',
-                                hour=00,
-                                id=f"set_night_price_{callback.from_user.id}",
-                                args=['+50'],
+                                hour=start_hour,
+                                minute=start_minute,
+                                id=job_id1,
+                                args=[f'+{tariff_price}'],
                                 )
             apscheduler.add_job(city_routers_update_all,
                                 trigger='cron',
-                                hour=7,
-                                id=f"set_day_price{callback.from_user.id}",
-                                args=['-50'],
+                                hour=end_hour,
+                                minute=end_minute,
+                                id=job_id2,
+                                args=[f'-{tariff_price}'],
                                 )
-            await callback.message.answer(
-                'Задача добавлена с 12 ночи до 7 - +50 рублей во всех связках\nЗадача добавлена с 7 утра до 12 - -50 рублей во всех связках')
+            
+            # Показываем информацию о следующих запусках
+            jobs = apscheduler.get_jobs()
+            next_runs = []
+            for job in jobs:
+                if job.id in [job_id1, job_id2]:
+                    next_run = job.next_run_time
+                    if next_run:
+                        next_runs.append(f"{job.id}: {next_run.strftime('%Y-%m-%d %H:%M:%S')}")
+            
+            answer_text = (
+                f'✅ Задача добавлена:\n'
+                f'Начало ночного тарифа: {start_hour:02d}:{start_minute:02d} (+{tariff_price} руб)\n'
+                f'Окончание ночного тарифа: {end_hour:02d}:{end_minute:02d} (-{tariff_price} руб)\n\n'
+            )
+            if next_runs:
+                answer_text += "Следующие запуски:\n" + "\n".join(next_runs)
+            
+            await callback.message.answer(answer_text)
         except ConflictingIdError:
-            await callback.message.answer('Задача добавлена с 12 ночи до 7 часов цена повышена во всех связка на ***')
+            await callback.message.answer('Задача уже добавлена')
             print('Ошибка запуска apscheduler.add_job')
 
     elif answer == 'NO':
-        job_id1 = f"set_night_price_{callback.from_user.id}"
-        job_id2 = f"set_day_price{callback.from_user.id}"
+        # Используем фиксированные глобальные ID
+        job_id1 = "set_night_price_global"
+        job_id2 = "set_day_price_global"
         print("Текущие задачи после добавления:", apscheduler.get_jobs())
         try:
             apscheduler.remove_job(job_id1)
@@ -654,10 +698,403 @@ async def night_change_kb(callback: CallbackQuery, bot: Bot, apscheduler: AsyncI
             print('Ошибка остановки apscheduler.add_job')
 
 
+# Ночной тариф
+class NightTariff(StatesGroup):
+    set_start_hour = State()
+    set_start_minute = State()
+    set_end_hour = State()
+    set_end_minute = State()
+    set_price = State()
+
+
+@admin.callback_query(IsAdmin(), F.data == 'night_tariff_set_time')
+async def night_tariff_set_time(callback: CallbackQuery):
+    """Открыть настройки времени ночного тарифа"""
+    await callback.answer('')
+    settings = await get_settings()
+    if not settings:
+        await callback.message.answer('Ошибка: настройки не найдены')
+        return
+    
+    start_hour = settings.night_tariff_start_hour if settings.night_tariff_start_hour is not None else 0
+    start_minute = settings.night_tariff_start_minute if settings.night_tariff_start_minute is not None else 0
+    end_hour = settings.night_tariff_end_hour if settings.night_tariff_end_hour is not None else 7
+    end_minute = settings.night_tariff_end_minute if settings.night_tariff_end_minute is not None else 0
+    
+    print(f'Текущие настройки времени: начало {start_hour:02d}:{start_minute:02d}, окончание {end_hour:02d}:{end_minute:02d}')
+    
+    text = (f"<b>Настройка времени ночного тарифа</b>\n\n"
+            f"Текущее время:\n"
+            f"Начало: {start_hour:02d}:{start_minute:02d}\n"
+            f"Окончание: {end_hour:02d}:{end_minute:02d}\n\n"
+            f"Выберите, что хотите изменить:")
+    
+    await callback.message.edit_text(
+        text=text,
+        reply_markup=await kb_admin.night_tariff_time_kb(),
+        parse_mode='HTML'
+    )
+
+
+@admin.callback_query(IsAdmin(), F.data == 'night_tariff_set_start_hour')
+async def night_tariff_set_start_hour(callback: CallbackQuery, state: FSMContext):
+    """Установить час начала ночного тарифа"""
+    await callback.answer('')
+    print(f'Обработчик night_tariff_set_start_hour вызван для callback: {callback.data}')
+    try:
+        await callback.message.answer(
+            'Введите час начала ночного тарифа (0-23):\n'
+            'Например: 0 (полночь), 22 (22:00)',
+            reply_markup=await kb.cancel_order()
+        )
+        await state.set_state(NightTariff.set_start_hour)
+        print(f'Состояние установлено: NightTariff.set_start_hour')
+    except Exception as e:
+        await callback.message.answer(f'Ошибка: {str(e)}')
+        print(f'Ошибка в night_tariff_set_start_hour: {e}')
+        import traceback
+        traceback.print_exc()
+
+
+@admin.callback_query(IsAdmin(), F.data == 'night_tariff_set_start_minute')
+async def night_tariff_set_start_minute(callback: CallbackQuery, state: FSMContext):
+    """Установить минуту начала ночного тарифа"""
+    await callback.answer('')
+    print(f'Обработчик night_tariff_set_start_minute вызван для callback: {callback.data}')
+    try:
+        await callback.message.answer(
+            'Введите минуту начала ночного тарифа (0-59):\n'
+            'Например: 0, 30, 45',
+            reply_markup=await kb.cancel_order()
+        )
+        await state.set_state(NightTariff.set_start_minute)
+        print(f'Состояние установлено: NightTariff.set_start_minute')
+    except Exception as e:
+        await callback.message.answer(f'Ошибка: {str(e)}')
+        print(f'Ошибка в night_tariff_set_start_minute: {e}')
+        import traceback
+        traceback.print_exc()
+
+
+@admin.callback_query(IsAdmin(), F.data == 'night_tariff_set_end_hour')
+async def night_tariff_set_end_hour(callback: CallbackQuery, state: FSMContext):
+    """Установить час окончания ночного тарифа"""
+    await callback.answer('')
+    print(f'Обработчик night_tariff_set_end_hour вызван для callback: {callback.data}')
+    try:
+        await callback.message.answer(
+            'Введите час окончания ночного тарифа (0-23):\n'
+            'Например: 7 (7:00), 8 (8:00)',
+            reply_markup=await kb.cancel_order()
+        )
+        await state.set_state(NightTariff.set_end_hour)
+        print(f'Состояние установлено: NightTariff.set_end_hour')
+    except Exception as e:
+        await callback.message.answer(f'Ошибка: {str(e)}')
+        print(f'Ошибка в night_tariff_set_end_hour: {e}')
+        import traceback
+        traceback.print_exc()
+
+
+@admin.callback_query(IsAdmin(), F.data == 'night_tariff_set_end_minute')
+async def night_tariff_set_end_minute(callback: CallbackQuery, state: FSMContext):
+    """Установить минуту окончания ночного тарифа"""
+    await callback.answer('')
+    print(f'Обработчик night_tariff_set_end_minute вызван для callback: {callback.data}')
+    try:
+        await callback.message.answer(
+            'Введите минуту окончания ночного тарифа (0-59):\n'
+            'Например: 0, 30, 45',
+            reply_markup=await kb.cancel_order()
+        )
+        await state.set_state(NightTariff.set_end_minute)
+        print(f'Состояние установлено: NightTariff.set_end_minute')
+    except Exception as e:
+        await callback.message.answer(f'Ошибка: {str(e)}')
+        print(f'Ошибка в night_tariff_set_end_minute: {e}')
+        import traceback
+        traceback.print_exc()
+
+
+@admin.callback_query(IsAdmin(), F.data == 'night_tariff_set_price')
+async def night_tariff_set_price(callback: CallbackQuery, state: FSMContext):
+    """Установить сумму ночного тарифа"""
+    await callback.answer('')
+    print(f'Обработчик night_tariff_set_price вызван для callback: {callback.data}')
+    try:
+        settings = await get_settings()
+        if not settings:
+            await callback.message.answer('Ошибка: настройки не найдены')
+            return
+        
+        current_price = settings.night_tariff_price if settings.night_tariff_price is not None else 50
+        print(f'Текущая сумма из БД: {current_price} (settings.night_tariff_price = {settings.night_tariff_price})')
+        
+        # Используем answer вместо edit_text, так как может быть конфликт с диалогами
+        await callback.message.answer(
+            f'<b>Настройка суммы ночного тарифа</b>\n\n'
+            f'Текущая сумма: {current_price} рублей\n\n'
+            f'Введите новую сумму (положительное число):\n'
+            f'Например: 50, 75, 100',
+            reply_markup=await kb.cancel_order(),
+            parse_mode='HTML'
+        )
+        await state.set_state(NightTariff.set_price)
+        print(f'Состояние установлено: NightTariff.set_price')
+    except Exception as e:
+        await callback.message.answer(f'Ошибка: {str(e)}')
+        print(f'Ошибка в night_tariff_set_price: {e}')
+        import traceback
+        traceback.print_exc()
+
+
+@admin.message(IsAdmin(), NightTariff.set_start_hour, F.text)
+async def night_tariff_save_start_hour(message: Message, state: FSMContext, apscheduler: AsyncIOScheduler = None):
+    """Сохранить час начала ночного тарифа"""
+    input_hour = message.text.strip()
+    pattern = r"^(0|[1-9]|1[0-9]|2[0-3])$"  # 0-23
+    
+    if re.match(pattern, input_hour):
+        hour = int(input_hour)
+        await update_settings(night_tariff_start_hour=hour)
+        
+        # Перезапускаем задачи, если они активны
+        if apscheduler:
+            print(f'apscheduler доступен, перезапускаем задачи...')
+            await restart_night_tariff_jobs(message, apscheduler)
+        else:
+            print(f'apscheduler НЕ доступен!')
+            await message.answer(
+                f'Час начала ночного тарифа установлен: {hour:02d}:00\n'
+                f'⚠️ Для применения изменений перезапустите ночной тариф вручную (Включить → Отключить → Включить)'
+            )
+            await state.clear()
+            return
+        
+        settings = await get_settings()
+        start_minute = settings.night_tariff_start_minute if settings and settings.night_tariff_start_minute is not None else 0
+        await message.answer(f'Час начала ночного тарифа установлен: {hour:02d}:{start_minute:02d}')
+        await state.clear()
+    else:
+        await message.answer("Пожалуйста, введите число от 0 до 23.")
+
+
+@admin.message(IsAdmin(), NightTariff.set_start_minute, F.text)
+async def night_tariff_save_start_minute(message: Message, state: FSMContext, apscheduler: AsyncIOScheduler = None):
+    """Сохранить минуту начала ночного тарифа"""
+    input_minute = message.text.strip()
+    pattern = r"^(0|[1-5]?[0-9])$"  # 0-59
+    
+    if re.match(pattern, input_minute):
+        minute = int(input_minute)
+        if 0 <= minute <= 59:
+            await update_settings(night_tariff_start_minute=minute)
+            
+            # Перезапускаем задачи, если они активны
+            if apscheduler:
+                print(f'apscheduler доступен, перезапускаем задачи...')
+                await restart_night_tariff_jobs(message, apscheduler)
+            else:
+                print(f'apscheduler НЕ доступен!')
+                settings = await get_settings()
+                start_hour = settings.night_tariff_start_hour if settings and settings.night_tariff_start_hour is not None else 0
+                await message.answer(
+                    f'Минута начала ночного тарифа установлена: {start_hour:02d}:{minute:02d}\n'
+                    f'⚠️ Для применения изменений перезапустите ночной тариф вручную (Включить → Отключить → Включить)'
+                )
+                await state.clear()
+                return
+            
+            settings = await get_settings()
+            start_hour = settings.night_tariff_start_hour if settings and settings.night_tariff_start_hour is not None else 0
+            await message.answer(f'Минута начала ночного тарифа установлена: {start_hour:02d}:{minute:02d}')
+            await state.clear()
+        else:
+            await message.answer("Пожалуйста, введите число от 0 до 59.")
+    else:
+        await message.answer("Пожалуйста, введите число от 0 до 59.")
+
+
+@admin.message(IsAdmin(), NightTariff.set_end_hour, F.text)
+async def night_tariff_save_end_hour(message: Message, state: FSMContext, apscheduler: AsyncIOScheduler = None):
+    """Сохранить час окончания ночного тарифа"""
+    input_hour = message.text.strip()
+    pattern = r"^(0|[1-9]|1[0-9]|2[0-3])$"  # 0-23
+    
+    if re.match(pattern, input_hour):
+        hour = int(input_hour)
+        await update_settings(night_tariff_end_hour=hour)
+        
+        # Перезапускаем задачи, если они активны
+        if apscheduler:
+            print(f'apscheduler доступен, перезапускаем задачи...')
+            await restart_night_tariff_jobs(message, apscheduler)
+        else:
+            print(f'apscheduler НЕ доступен!')
+            await message.answer(
+                f'Час окончания ночного тарифа установлен: {hour:02d}:00\n'
+                f'⚠️ Для применения изменений перезапустите ночной тариф вручную (Включить → Отключить → Включить)'
+            )
+            await state.clear()
+            return
+        
+        settings = await get_settings()
+        end_minute = settings.night_tariff_end_minute if settings and settings.night_tariff_end_minute is not None else 0
+        await message.answer(f'Час окончания ночного тарифа установлен: {hour:02d}:{end_minute:02d}')
+        await state.clear()
+    else:
+        await message.answer("Пожалуйста, введите число от 0 до 23.")
+
+
+@admin.message(IsAdmin(), NightTariff.set_end_minute, F.text)
+async def night_tariff_save_end_minute(message: Message, state: FSMContext, apscheduler: AsyncIOScheduler = None):
+    """Сохранить минуту окончания ночного тарифа"""
+    input_minute = message.text.strip()
+    pattern = r"^(0|[1-5]?[0-9])$"  # 0-59
+    
+    if re.match(pattern, input_minute):
+        minute = int(input_minute)
+        if 0 <= minute <= 59:
+            await update_settings(night_tariff_end_minute=minute)
+            
+            # Перезапускаем задачи, если они активны
+            if apscheduler:
+                print(f'apscheduler доступен, перезапускаем задачи...')
+                await restart_night_tariff_jobs(message, apscheduler)
+            else:
+                print(f'apscheduler НЕ доступен!')
+                settings = await get_settings()
+                end_hour = settings.night_tariff_end_hour if settings and settings.night_tariff_end_hour is not None else 7
+                await message.answer(
+                    f'Минута окончания ночного тарифа установлена: {end_hour:02d}:{minute:02d}\n'
+                    f'⚠️ Для применения изменений перезапустите ночной тариф вручную (Включить → Отключить → Включить)'
+                )
+                await state.clear()
+                return
+            
+            settings = await get_settings()
+            end_hour = settings.night_tariff_end_hour if settings and settings.night_tariff_end_hour is not None else 7
+            await message.answer(f'Минута окончания ночного тарифа установлена: {end_hour:02d}:{minute:02d}')
+            await state.clear()
+        else:
+            await message.answer("Пожалуйста, введите число от 0 до 59.")
+    else:
+        await message.answer("Пожалуйста, введите число от 0 до 59.")
+
+
+@admin.message(IsAdmin(), NightTariff.set_price, F.text)
+async def night_tariff_save_price(message: Message, state: FSMContext, apscheduler: AsyncIOScheduler = None):
+    """Сохранить сумму ночного тарифа"""
+    input_price = message.text.strip()
+    pattern = r"^\d+$"  # Только положительные числа
+    
+    if re.match(pattern, input_price):
+        price = int(input_price)
+        if price > 0:
+            await update_settings(night_tariff_price=price)
+            
+            # Перезапускаем задачи, если они активны и apscheduler доступен
+            if apscheduler:
+                await restart_night_tariff_jobs(message, apscheduler)
+            
+            await message.answer(f'Сумма ночного тарифа установлена: {price} рублей')
+            await state.clear()
+        else:
+            await message.answer("Сумма должна быть больше 0.")
+    else:
+        await message.answer("Пожалуйста, введите положительное число.")
+
+
+async def restart_night_tariff_jobs(message: Message, apscheduler: AsyncIOScheduler):
+    """Перезапустить задачи ночного тарифа с новым временем"""
+    print(f'Перезапуск задач ночного тарифа...')
+    # Используем фиксированные глобальные ID
+    job_id1 = "set_night_price_global"
+    job_id2 = "set_day_price_global"
+    
+    # Проверяем, есть ли активные задачи
+    all_jobs = apscheduler.get_jobs()
+    print(f'Всего задач в scheduler: {len(all_jobs)}')
+    
+    # Удаляем старые задачи ночного тарифа (если есть)
+    try:
+        apscheduler.remove_job(job_id1)
+        print(f'Удалена задача: {job_id1}')
+    except JobLookupError:
+        print(f'Задача {job_id1} не найдена')
+    
+    try:
+        apscheduler.remove_job(job_id2)
+        print(f'Удалена задача: {job_id2}')
+    except JobLookupError:
+        print(f'Задача {job_id2} не найдена')
+    
+    # Получаем новое время и сумму из настроек
+    settings = await get_settings()
+    if not settings:
+        await message.answer('Ошибка: настройки не найдены')
+        return
+    
+    start_hour = settings.night_tariff_start_hour if settings.night_tariff_start_hour is not None else 0
+    start_minute = settings.night_tariff_start_minute if settings.night_tariff_start_minute is not None else 0
+    end_hour = settings.night_tariff_end_hour if settings.night_tariff_end_hour is not None else 7
+    end_minute = settings.night_tariff_end_minute if settings.night_tariff_end_minute is not None else 0
+    tariff_price = settings.night_tariff_price if settings.night_tariff_price is not None else 50
+    
+    print(f'Создаем новые задачи: начало {start_hour:02d}:{start_minute:02d}, окончание {end_hour:02d}:{end_minute:02d}, цена {tariff_price}')
+    
+    try:
+        apscheduler.add_job(city_routers_update_all,
+                            trigger='cron',
+                            hour=start_hour,
+                            minute=start_minute,
+                            id=job_id1,
+                            args=[f'+{tariff_price}'],
+                            )
+        print(f'Задача {job_id1} создана')
+        apscheduler.add_job(city_routers_update_all,
+                            trigger='cron',
+                            hour=end_hour,
+                            minute=end_minute,
+                            id=job_id2,
+                            args=[f'-{tariff_price}'],
+                            )
+        print(f'Задача {job_id2} создана')
+        
+        # Показываем информацию о следующих запусках
+        jobs = apscheduler.get_jobs()
+        next_runs = []
+        for job in jobs:
+            if job.id in [job_id1, job_id2]:
+                next_run = job.next_run_time
+                if next_run:
+                    next_runs.append(f"{job.id}: {next_run.strftime('%Y-%m-%d %H:%M:%S')}")
+                    print(f'Следующий запуск {job.id}: {next_run}')
+        
+        answer_text = (
+            f'\n✅ Задачи перезапущены:\n'
+            f'Начало: {start_hour:02d}:{start_minute:02d} (+{tariff_price} руб)\n'
+            f'Окончание: {end_hour:02d}:{end_minute:02d} (-{tariff_price} руб)\n\n'
+        )
+        if next_runs:
+            answer_text += "Следующие запуски:\n" + "\n".join(next_runs)
+        
+        await message.answer(answer_text)
+    except ConflictingIdError:
+        await message.answer('Ошибка: Задача с таким ID уже существует. Возможно, она не была удалена.')
+        print('Ошибка запуска apscheduler.add_job в restart_night_tariff_jobs: ConflictingIdError')
+    except Exception as e:
+        await message.answer(f'Ошибка при перезапуске задач: {str(e)}')
+        print(f'Ошибка при перезапуске задач ночного тарифа: {e}')
+        import traceback
+        traceback.print_exc()
+
+
 # Бесплатные поездки
 class FreeOrder(StatesGroup):
     free_order_user = State()
     free_order_price = State()
+    free_ride_cities = State()  # Для хранения выбранных городов
 
 
 @admin.callback_query(IsAdmin(), F.data == 'freeorder')
@@ -679,10 +1116,29 @@ async def change_settings_value(message: Message, state: FSMContext):
     input_int = message.text.strip()
     pattern = r"^\d+$"
     if re.match(pattern, input_int):
-        await state.update_data(free_price=message.text)
-        data = await state.get_data()
-        await update_settings(free_price=int(data['free_price']))
-        await message.answer(f'Цена успешна добавлена ')
+        new_free_price = int(input_int)
+        
+        # Получаем старое значение free_price
+        old_settings = await get_settings()
+        old_free_price = old_settings.free_price if old_settings else None
+        
+        # Обновляем настройку
+        await update_settings(free_price=new_free_price)
+        
+        # Если новый порог меньше старого, корректируем счетчики пользователей
+        if old_free_price is not None and new_free_price < old_free_price:
+            updated_count = await adjust_user_free_ride_counters(new_free_price)
+            if updated_count > 0:
+                await message.answer(
+                    f'Цена успешно изменена с {old_free_price} на {new_free_price}.\n'
+                    f'Счетчик установлен в 1 для {updated_count} пользователей, '
+                    f'у которых счетчик был {new_free_price} или выше.'
+                )
+            else:
+                await message.answer(f'Цена успешно изменена с {old_free_price} на {new_free_price}.')
+        else:
+            await message.answer(f'Цена успешно изменена на {new_free_price}.')
+        
         await state.clear()
     else:
         await message.answer("Пожалуйста, введите только цифры.")
@@ -797,3 +1253,79 @@ async def change_settings(callback: CallbackQuery):
             reply_markup=kb_admin.admin_keyboard(free_ride=True)
         )
         await update_settings(free_ride=True)
+
+
+@admin.callback_query(IsAdmin(), F.data == "free_ride_select_cities")
+async def free_ride_select_cities(callback: CallbackQuery, state: FSMContext):
+    """Открыть настройки выбора городов для бесплатной поездки"""
+    await callback.answer('')
+    settings = await get_settings()
+    selected_city_ids = settings.free_ride_allowed_cities if settings and settings.free_ride_allowed_cities else []
+    
+    # Сохраняем в state
+    await state.update_data(selected_city_ids=selected_city_ids)
+    
+    text = ("<b>Выбор городов для бесплатной поездки</b>\n\n"
+            "Выберите города, которые будут доступны при выборе бесплатной поездки.\n"
+            "Нажмите на город, чтобы добавить/убрать его из списка.\n"
+            "После выбора нажмите 'Сохранить'.")
+    
+    await callback.message.edit_text(
+        text=text,
+        reply_markup=await kb_admin.free_ride_cities_kb(selected_city_ids),
+        parse_mode='HTML'
+    )
+
+
+@admin.callback_query(IsAdmin(), F.data.startswith("toggle_free_city_"))
+async def toggle_free_city(callback: CallbackQuery, state: FSMContext):
+    """Переключить выбор города для бесплатной поездки"""
+    await callback.answer('')
+    city_id = int(callback.data.split('_')[-1])
+    
+    # Получаем из state
+    data = await state.get_data()
+    selected_city_ids = list(data.get('selected_city_ids', []))
+    
+    if city_id in selected_city_ids:
+        selected_city_ids.remove(city_id)
+    else:
+        selected_city_ids.append(city_id)
+    
+    # Сохраняем обратно в state
+    await state.update_data(selected_city_ids=selected_city_ids)
+    
+    # Обновляем клавиатуру
+    text = ("<b>Выбор городов для бесплатной поездки</b>\n\n"
+            "Выберите города, которые будут доступны при выборе бесплатной поездки.\n"
+            "Нажмите на город, чтобы добавить/убрать его из списка.\n"
+            "После выбора нажмите 'Сохранить'.")
+    
+    await callback.message.edit_text(
+        text=text,
+        reply_markup=await kb_admin.free_ride_cities_kb(selected_city_ids),
+        parse_mode='HTML'
+    )
+
+
+@admin.callback_query(IsAdmin(), F.data == "save_free_cities")
+async def save_free_cities(callback: CallbackQuery, state: FSMContext):
+    """Сохранить выбранные города для бесплатной поездки"""
+    await callback.answer('')
+    
+    # Получаем из state
+    data = await state.get_data()
+    selected_city_ids = data.get('selected_city_ids', [])
+    
+    # Сохраняем в базу
+    await update_settings(free_ride_allowed_cities=selected_city_ids)
+    
+    await callback.message.edit_text(
+        text="<b>Города успешно сохранены!</b>\n\n"
+             f"Выбрано городов: {len(selected_city_ids)}\n\n"
+             "Нажмите 'Назад' чтобы вернуться в меню.",
+        reply_markup=await kb_admin.free_ride_cities_kb(selected_city_ids),
+        parse_mode='HTML'
+    )
+    
+    await state.clear()

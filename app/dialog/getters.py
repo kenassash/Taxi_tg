@@ -42,11 +42,14 @@ async def get_role_driver(
                 else:
                     text += f'До бесплатной поездки осталось <b>{status.free_price - user.free_ride}</b>'
 
+                # Показываем выбор платно/бесплатно если пользователь имеет право (free_ride == 0 или paid_free == True)
+                show_paid_free = user.free_ride == 0 or user.paid_free == True
+                
                 data = {
                     'text': text,
                     "is_driver": bool(driver),
                     "paid_free_items": paid_free_items,
-                    "paid_free": bool(user.paid_free),  # ✅ Для водителей
+                    "paid_free": show_paid_free,  # Показываем если есть право на выбор
                     "paid_free_selected": dialog_manager.dialog_data.get("paid_free_selected", False),
                     "driver_status_items": driver_status_items,
                     "driver_active": driver.active,
@@ -72,11 +75,14 @@ async def get_role_driver(
                 else:
                     text += f'До бесплатной поездки осталось <b>{status.free_price - user.free_ride}</b>'
 
+                # Показываем выбор платно/бесплатно если пользователь имеет право (free_ride == 0 или paid_free == True)
+                show_paid_free = user.free_ride == 0 or user.paid_free == True
+
                 data = {
                     'text': text,
                     "is_driver": bool(driver),
                     "paid_free_items": paid_free_items,
-                    "paid_free": bool(user.paid_free),  # ✅ Добавил для пользователей
+                    "paid_free": show_paid_free,  # Показываем если есть право на выбор
                     "paid_free_selected": dialog_manager.dialog_data.get("paid_free_selected", False),
                     "driver_status_items": driver_status_items,
                     "driver_active": False,
@@ -182,6 +188,15 @@ def _allow_another_locality(user) -> bool:
 async def get_city_inside1(dialog_manager: DialogManager, **kwargs, ):
     cities = await get_cities_inside()
     user = await get_user(dialog_manager.event.from_user.id)
+    
+    # Если выбрана бесплатная поездка, фильтруем города по настройкам админа
+    if user and user.free_ride == 0 and user.paid_free_value == '2':
+        settings = await get_settings()
+        if settings and settings.free_ride_allowed_cities:
+            # Фильтруем города по разрешенным ID
+            allowed_city_ids = set(settings.free_ride_allowed_cities)
+            cities = [city for city in cities if city.id in allowed_city_ids]
+    
     data = {
         'city_inside1': cities,
         'allow_another': _allow_another_locality(user),
@@ -197,6 +212,14 @@ async def get_city_inside2(dialog_manager: DialogManager, **kwargs, ):
 
     user = await get_user(dialog_manager.event.from_user.id)
     allow_another = _allow_another_locality(user)
+    
+    # Если выбрана бесплатная поездка, фильтруем города по настройкам админа
+    if user and user.free_ride == 0 and user.paid_free_value == '2':
+        settings = await get_settings()
+        if settings and settings.free_ride_allowed_cities:
+            # Фильтруем города по разрешенным ID
+            allowed_city_ids = set(settings.free_ride_allowed_cities)
+            cities = [city for city in cities if city.id in allowed_city_ids]
 
     if city1_id:
         data = {
@@ -272,17 +295,21 @@ async def get_order(dialog_manager: DialogManager, **kwargs):
     price_route = 0
     data_hide = {}
     user_id = await get_user(dialog_manager.event.from_user.id)
+    # Проверяем, выбрана ли бесплатная поездка
+    is_free_ride = user_id and user_id.free_ride == 0 and user_id.paid_free_value == '2'
+    
     if city1_id and city2_id:
         # связка изменние цены индивидуально
         price = await get_route_price(city1_id, city2_id)
-        data_hide = {'another_hide': True}
+        # Скрываем кнопку "Добавить адрес" при бесплатной поездке
+        data_hide = {'another_hide': not is_free_ride}
         # Бесплатные поездки
-        if user_id.free_ride == 0 and user_id.paid_free_value == '2':
+        if is_free_ride:
             price_route += price
             price = 0
 
     elif another1_id or another2_id:
-        # скрыть кнопку "Добавить адрес" если есть другой н.п.
+        # скрыть кнопку "Добавить адрес" если есть другой н.п. или бесплатная поездка
         data_hide = {'another_hide': False}
         price1 = 0
         price2 = 0
@@ -352,6 +379,10 @@ async def get_order_with_new_address1(dialog_manager: DialogManager, **kwargs):
     # удаляем старую ценну добавляем новую
     dialog_manager.dialog_data['price'] = price
 
+    # Проверяем, выбрана ли бесплатная поездка
+    user_id = await get_user(dialog_manager.event.from_user.id)
+    is_free_ride = user_id and user_id.free_ride == 0 and user_id.paid_free_value == '2'
+
     data = {
         'city1_id': city1_id,
         'city2_id': city2_id,
@@ -360,6 +391,7 @@ async def get_order_with_new_address1(dialog_manager: DialogManager, **kwargs):
         'add_new_address1': add_new_address1,
         'add_street_address1': add_street_address1,
         'price': price,
+        'another_hide': not is_free_ride,  # Скрываем кнопку при бесплатной поездке
     }
     return data
 

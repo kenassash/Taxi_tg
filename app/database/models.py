@@ -1,7 +1,7 @@
 import os
 from typing import List
 
-from sqlalchemy import BigInteger, ForeignKey, String, DateTime, func, Boolean, Integer
+from sqlalchemy import BigInteger, ForeignKey, String, DateTime, func, Boolean, Integer, JSON
 from sqlalchemy.orm import Mapped, mapped_column, relationship, DeclarativeBase
 from sqlalchemy.ext.asyncio import AsyncAttrs, async_sessionmaker, create_async_engine
 from app.database import Base
@@ -131,6 +131,12 @@ class SettingModel(Base):
     free_ride: Mapped[bool] = mapped_column(default=False)
     free_price: Mapped[int] = mapped_column(nullable=True)
     auto_distribution: Mapped[bool] = mapped_column(default=False)
+    free_ride_allowed_cities: Mapped[List[int] | None] = mapped_column(JSON, nullable=True)  # Список ID городов доступных для бесплатной поездки
+    night_tariff_start_hour: Mapped[int] = mapped_column(Integer, nullable=True, default=0)  # Час начала ночного тарифа (0-23)
+    night_tariff_start_minute: Mapped[int] = mapped_column(Integer, nullable=True, default=0)  # Минута начала ночного тарифа (0-59)
+    night_tariff_end_hour: Mapped[int] = mapped_column(Integer, nullable=True, default=7)  # Час окончания ночного тарифа (0-23)
+    night_tariff_end_minute: Mapped[int] = mapped_column(Integer, nullable=True, default=0)  # Минута окончания ночного тарифа (0-59)
+    night_tariff_price: Mapped[int] = mapped_column(Integer, nullable=True, default=50)  # Сумма изменения цены при ночном тарифе
 
 
 class OnlineExecution(Base):
