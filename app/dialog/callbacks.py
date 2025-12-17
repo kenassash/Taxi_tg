@@ -303,6 +303,22 @@ async def order_now(callback: CallbackQuery,
 
         # Сохраняем в базу
         await set_chat_id_user(order_id, driver_id=str(next_driver.tg_id), chat_id_driver=str(message_id_driver.message_id))
+        
+        # Отправляем заказ админам для мониторинга
+        try:
+            admin_list = bot.my_admins_list if hasattr(bot, 'my_admins_list') else []
+            for admin_id in admin_list:
+                try:
+                    await bot.send_message(
+                        chat_id=admin_id,
+                        text=f"📋 <b>Новый заказ (автораспределение)</b>\n\n{text_order}",
+                        reply_markup=await kb.accept(order_id)
+                    )
+                except TelegramBadRequest as e:
+                    if "chat not found" not in str(e).lower():
+                        print(f"Ошибка отправки заказа админу {admin_id}: {e}")
+        except Exception as e:
+            print(f"Ошибка при отправке заказов админам: {e}")
     else:
         dialog_manager.dialog_data.clear()
         dialog_manager.dialog_data['order_id'] = order_id

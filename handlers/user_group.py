@@ -15,6 +15,7 @@ import app.keyboards as kb
 from app.database.requests import get_all_orders, get_driver, start_order_execution, delete_order_execution, \
     set_chat_id_driver, set_chat_id_user, update_driver, get_all_active_drivers, get_next_available_driver, \
     increment_driver_order_count, mark_driver_inactive
+from app.driver_activity_check import mark_driver_responded
 
 from middleware.driver_active_middleware import DriverActiveMiddleware
 

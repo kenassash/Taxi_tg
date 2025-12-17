@@ -20,6 +20,8 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from app.admin import admin
 from middleware.Scheduler_middleware import SchedulerMiddleware
 from middleware.time_restriction_middleware import TimeRestrictionMiddleware
+from app.driver_activity_check import send_activity_check_to_drivers, check_driver_activity_responses
+from app.database.requests import get_settings
 
 load_dotenv()
 
@@ -31,6 +33,31 @@ async def main():
     bot = Bot(token=bot_config.token.get_secret_value(), default=DefaultBotProperties(parse_mode=ParseMode.HTML))
     scheduler = AsyncIOScheduler(timezone='Asia/Yakutsk')
     scheduler.start()
+
+    # Настройки интервалов из БД (по умолчанию 2 часа и 10 минут)
+    settings = await get_settings()
+    interval_hours = settings.driver_check_interval_hours if settings and settings.driver_check_interval_hours else 2
+    timeout_minutes = settings.driver_inactive_timeout_minutes if settings and settings.driver_inactive_timeout_minutes else 10
+
+    # Задача: отправка проверок активности (интервал в часах, настраиваемый)
+    scheduler.add_job(
+        send_activity_check_to_drivers,
+        trigger='interval',
+        hours=interval_hours,
+        id='driver_activity_check_send',
+        args=[bot],
+        replace_existing=True
+    )
+
+    # Задача: проверка ответов (частая, 1 мин; таймаут используется внутри функции)
+    scheduler.add_job(
+        check_driver_activity_responses,
+        trigger='interval',
+        minutes=1,
+        id='driver_activity_check_responses',
+        args=[bot],
+        replace_existing=True
+    )
 
     bot.my_admins_list = admin_list
     dp = Dispatcher(db_engine=engine)

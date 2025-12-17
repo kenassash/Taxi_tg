@@ -5,6 +5,7 @@ from datetime import datetime, timedelta
 
 from aiogram import Router, F, Bot
 from aiogram.types import Message, CallbackQuery, ReplyKeyboardRemove
+from aiogram.exceptions import TelegramBadRequest
 from aiogram.filters import CommandStart, Command, Filter, or_f
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
@@ -16,7 +17,9 @@ from app.database.requests import add_car, get_all_car, remove_car, print_all_on
     get_all_drivers_with_update_date, get_users, get_one_car, get_driver_info, reset_to_zero, update_car, \
     get_users_count, add_change_price, ban_user, get_ban_all_user, get_cities_routes_price, \
     get_cities_routes_price_update, no_active, get_all_orders, city_routers_update_all, save_free_ride_by_phone, \
-    update_driver, get_settings, update_settings, adjust_user_free_ride_counters
+    update_driver, get_settings, update_settings, adjust_user_free_ride_counters, get_driver, start_order_execution, \
+    set_chat_id_driver, set_chat_id_user
+from app.driver_activity_check import send_activity_check_to_drivers, check_driver_activity_responses
 
 import app.keyboards as kb
 import app.kb.kb_admin as kb_admin
@@ -42,6 +45,20 @@ class AddDriver(StatesGroup):
     number_car = State()
     photo_car = State()
     tg_id = State()
+
+
+class SleepTime(StatesGroup):
+    set_start_hour = State()
+    set_start_minute = State()
+    set_end_hour = State()
+    set_end_minute = State()
+    set_days = State()
+    set_message = State()
+
+
+class DriverActivity(StatesGroup):
+    set_interval_hours = State()
+    set_timeout_minutes = State()
 
 
 # class AdminProtect(Filter):
@@ -107,6 +124,11 @@ async def send_info_order(message: Message, state: FSMContext):
 @admin.callback_query(IsAdmin(), F.data == 'driver_block')
 async def block_driver(callback: CallbackQuery):
     await callback.answer('')
+    settings = await get_settings()
+    if not settings or not settings.auto_distribution:
+        await callback.message.answer('Автораспределение выключено — управление активностью водителей недоступно.')
+        return
+
     await callback.message.answer('Выберите',
                                   reply_markup=await kb_admin.button_deactive())
 
@@ -124,7 +146,14 @@ async def driver_no_active(callback: CallbackQuery, state: FSMContext):
 async def no_active_driver(callback: CallbackQuery, state: FSMContext):
     await callback.answer('')
     data = await state.get_data()
-    driver_id = callback.data.split('_')[1]
+    driver_id_str = callback.data.split('_')[1]
+    try:
+        driver_id = int(driver_id_str)
+    except ValueError:
+        await callback.message.edit_text('Ошибка: неверный ID водителя')
+        await state.clear()
+        return
+    
     if data['block_driver'] == 'YES':
         await no_active(driver_id, is_start=False)
         await callback.message.edit_text(f'Водитель заблокирован')
@@ -132,6 +161,141 @@ async def no_active_driver(callback: CallbackQuery, state: FSMContext):
         await no_active(driver_id, is_start=True)
         await callback.message.edit_text(f'Водитель разблокирован')
     await state.clear()
+
+# ------------------Активность водителей (интервалы)---------------
+
+
+async def restart_driver_activity_jobs(bot: Bot, apscheduler: AsyncIOScheduler):
+    """Перезапуск задач проверки активности с новыми настройками"""
+    settings = await get_settings()
+    interval_hours = settings.driver_check_interval_hours if settings and settings.driver_check_interval_hours else 2
+
+    for job_id in ['driver_activity_check_send', 'driver_activity_check_responses']:
+        try:
+            apscheduler.remove_job(job_id)
+        except JobLookupError:
+            pass
+
+    apscheduler.add_job(
+        send_activity_check_to_drivers,
+        trigger='interval',
+        hours=interval_hours,
+        id='driver_activity_check_send',
+        args=[bot],
+        replace_existing=True
+    )
+    apscheduler.add_job(
+        check_driver_activity_responses,
+        trigger='interval',
+        minutes=1,  # таймаут читается внутри функции
+        id='driver_activity_check_responses',
+        args=[bot],
+        replace_existing=True
+    )
+
+
+@admin.callback_query(IsAdmin(), F.data == 'driver_activity')
+async def driver_activity_menu(callback: CallbackQuery):
+    await callback.answer('')
+    settings = await get_settings()
+    interval = settings.driver_check_interval_hours if settings and settings.driver_check_interval_hours else 2
+    timeout = settings.driver_inactive_timeout_minutes if settings and settings.driver_inactive_timeout_minutes else 10
+    text = (
+        "<b>Активность водителей</b>\n\n"
+        f"Текущий интервал отправки: {interval} ч\n"
+        f"Текущий таймаут без ответа: {timeout} мин\n\n"
+        "Выберите, что изменить:"
+    )
+    await callback.message.answer(text, reply_markup=await kb_admin.driver_activity_kb(), parse_mode='HTML')
+
+
+@admin.callback_query(IsAdmin(), F.data == 'driver_activity_set_interval')
+async def driver_activity_set_interval(callback: CallbackQuery, state: FSMContext):
+    await callback.answer('')
+    await callback.message.answer("Введите интервал отправки (в часах, целое число > 0):", reply_markup=await kb.cancel_order())
+    await state.set_state(DriverActivity.set_interval_hours)
+
+
+@admin.callback_query(IsAdmin(), F.data == 'driver_activity_set_timeout')
+async def driver_activity_set_timeout(callback: CallbackQuery, state: FSMContext):
+    await callback.answer('')
+    await callback.message.answer("Введите таймаут без ответа (в минутах, целое число > 0):", reply_markup=await kb.cancel_order())
+    await state.set_state(DriverActivity.set_timeout_minutes)
+
+
+@admin.message(IsAdmin(), DriverActivity.set_interval_hours, F.text)
+async def driver_activity_save_interval(message: Message, state: FSMContext, apscheduler: AsyncIOScheduler = None, bot: Bot | None = None):
+    value = message.text.strip()
+    if not value.isdigit() or int(value) <= 0:
+        await message.answer("Введите положительное целое число (часы).")
+        return
+    hours = int(value)
+    await update_settings(driver_check_interval_hours=hours)
+    await message.answer(f"Интервал отправки установлен: {hours} ч")
+
+    if apscheduler and bot:
+        await restart_driver_activity_jobs(bot, apscheduler)
+        await message.answer("Задачи проверки активности перезапущены с новым интервалом.")
+    await state.clear()
+
+
+@admin.message(IsAdmin(), DriverActivity.set_timeout_minutes, F.text)
+async def driver_activity_save_timeout(message: Message, state: FSMContext, apscheduler: AsyncIOScheduler = None, bot: Bot | None = None):
+    value = message.text.strip()
+    if not value.isdigit() or int(value) <= 0:
+        await message.answer("Введите положительное целое число (минуты).")
+        return
+    minutes = int(value)
+    await update_settings(driver_inactive_timeout_minutes=minutes)
+    await message.answer(f"Таймаут без ответа установлен: {minutes} мин")
+
+    if apscheduler and bot:
+        await restart_driver_activity_jobs(bot, apscheduler)
+    await state.clear()
+
+
+@admin.callback_query(IsAdmin(), F.data == 'admin_back')
+async def admin_back(callback: CallbackQuery):
+    await callback.answer('')
+    await callback.message.answer("Что хотите сделать?", reply_markup=kb_admin.admin_keyboard())
+
+
+# ------------------Список водителей (активен/неактивен)---------
+
+@admin.callback_query(IsAdmin(), F.data == 'drivers_list')
+async def drivers_list(callback: CallbackQuery):
+    await callback.answer('')
+    settings = await get_settings()
+    if not settings or not settings.auto_distribution:
+        await callback.message.answer('Автораспределение выключено — просмотр статуса водителей недоступен.')
+        return
+    
+    drivers_result = await get_all_car()
+    drivers = list(drivers_result) if drivers_result else []
+    
+    if not drivers:
+        await callback.message.answer('В системе нет водителей.')
+        return
+    
+    # Формируем список: 1 строка = 1 водитель
+    lines = ["📋 Список водителей\n"]
+    
+    active_count = 0
+    inactive_count = 0
+    
+    for driver in drivers:
+        status = "🟢" if driver.active else "🔴"
+        driver_line = f"{status} {driver.name} - {driver.car_name} - {driver.number_car} - {driver.phone}"
+        lines.append(driver_line)
+        if driver.active:
+            active_count += 1
+        else:
+            inactive_count += 1
+    
+    lines.append(f"\nВсего: {len(drivers)} (🟢 {active_count} | 🔴 {inactive_count})")
+    text = "\n".join(lines)
+    
+    await callback.message.answer(text, parse_mode='HTML')
 
 
 # -----------------Время сна---------------
@@ -153,6 +317,284 @@ async def turn_or_of_timerest(callback: CallbackQuery):
     elif answer == 'NO':
         time_restriction_middleware_instance.deactivate()
         await callback.message.answer("Ограничение времени отправки сообщений деактивировано.")
+
+
+WEEKDAY_LABELS = {
+    0: "Пн",
+    1: "Вт",
+    2: "Ср",
+    3: "Чт",
+    4: "Пт",
+    5: "Сб",
+    6: "Вс",
+}
+
+
+def format_sleep_days(days: list[int] | None) -> str:
+    if not days:
+        return "Все дни"
+    sorted_days = sorted(days)
+    return ", ".join(WEEKDAY_LABELS.get(day, str(day)) for day in sorted_days)
+
+
+@admin.callback_query(IsAdmin(), F.data == 'sleep_time_set_time')
+async def sleep_time_set_time(callback: CallbackQuery):
+    """Открыть настройки времени сна"""
+    await callback.answer('')
+    settings = await get_settings()
+    if not settings:
+        await callback.message.answer('Ошибка: настройки не найдены')
+        return
+    
+    start_hour = settings.sleep_start_hour if settings.sleep_start_hour is not None else 23
+    start_minute = settings.sleep_start_minute if settings.sleep_start_minute is not None else 0
+    end_hour = settings.sleep_end_hour if settings.sleep_end_hour is not None else 7
+    end_minute = settings.sleep_end_minute if settings.sleep_end_minute is not None else 0
+    days_text = format_sleep_days(settings.sleep_days)
+    message_text = settings.sleep_message or "Извините, такси сейчас не работает"
+    
+    print(f'Текущие настройки времени сна: начало {start_hour:02d}:{start_minute:02d}, окончание {end_hour:02d}:{end_minute:02d}')
+    
+    text = (f"<b>Настройка времени сна</b>\n\n"
+            f"Текущее время:\n"
+            f"Начало: {start_hour:02d}:{start_minute:02d}\n"
+            f"Окончание: {end_hour:02d}:{end_minute:02d}\n"
+            f"Дни: {days_text}\n"
+            f"Сообщение: {message_text}\n\n"
+            f"Выберите, что хотите изменить:")
+    
+    await callback.message.answer(
+        text=text,
+        reply_markup=await kb_admin.sleep_time_kb(),
+        parse_mode='HTML'
+    )
+
+
+@admin.callback_query(IsAdmin(), F.data == 'sleep_time_set_start_hour')
+async def sleep_time_set_start_hour(callback: CallbackQuery, state: FSMContext):
+    """Установить час начала времени сна"""
+    await callback.answer('')
+    try:
+        await callback.message.answer(
+            'Введите час начала времени сна (0-23):\n'
+            'Например: 23 (23:00)',
+            reply_markup=await kb.cancel_order()
+        )
+        await state.set_state(SleepTime.set_start_hour)
+    except Exception as e:
+        await callback.message.answer(f'Ошибка: {str(e)}')
+        print(f'Ошибка в sleep_time_set_start_hour: {e}')
+        import traceback
+        traceback.print_exc()
+
+
+@admin.callback_query(IsAdmin(), F.data == 'sleep_time_set_start_minute')
+async def sleep_time_set_start_minute(callback: CallbackQuery, state: FSMContext):
+    """Установить минуту начала времени сна"""
+    await callback.answer('')
+    try:
+        await callback.message.answer(
+            'Введите минуту начала времени сна (0-59):\n'
+            'Например: 0, 30, 45',
+            reply_markup=await kb.cancel_order()
+        )
+        await state.set_state(SleepTime.set_start_minute)
+    except Exception as e:
+        await callback.message.answer(f'Ошибка: {str(e)}')
+        print(f'Ошибка в sleep_time_set_start_minute: {e}')
+        import traceback
+        traceback.print_exc()
+
+
+@admin.callback_query(IsAdmin(), F.data == 'sleep_time_set_end_hour')
+async def sleep_time_set_end_hour(callback: CallbackQuery, state: FSMContext):
+    """Установить час окончания времени сна"""
+    await callback.answer('')
+    try:
+        await callback.message.answer(
+            'Введите час окончания времени сна (0-23):\n'
+            'Например: 7 (7:00)',
+            reply_markup=await kb.cancel_order()
+        )
+        await state.set_state(SleepTime.set_end_hour)
+    except Exception as e:
+        await callback.message.answer(f'Ошибка: {str(e)}')
+        print(f'Ошибка в sleep_time_set_end_hour: {e}')
+        import traceback
+        traceback.print_exc()
+
+
+@admin.callback_query(IsAdmin(), F.data == 'sleep_time_set_end_minute')
+async def sleep_time_set_end_minute(callback: CallbackQuery, state: FSMContext):
+    """Установить минуту окончания времени сна"""
+    await callback.answer('')
+    try:
+        await callback.message.answer(
+            'Введите минуту окончания времени сна (0-59):\n'
+            'Например: 0, 30, 45',
+            reply_markup=await kb.cancel_order()
+        )
+        await state.set_state(SleepTime.set_end_minute)
+    except Exception as e:
+        await callback.message.answer(f'Ошибка: {str(e)}')
+        print(f'Ошибка в sleep_time_set_end_minute: {e}')
+        import traceback
+        traceback.print_exc()
+
+
+@admin.callback_query(IsAdmin(), F.data == 'sleep_time_set_days')
+async def sleep_time_set_days(callback: CallbackQuery, state: FSMContext):
+    """Настройка дней недели для режима сна"""
+    await callback.answer('')
+    settings = await get_settings()
+    current_days = format_sleep_days(settings.sleep_days if settings else None)
+    await callback.message.answer(
+        f'Текущие дни: {current_days}\n'
+        f'Введите дни недели через запятую (1-7), где 1=Пн ... 7=Вс.\n'
+        f'Например: 1,2,3,4,5 или 6,7',
+        reply_markup=await kb.cancel_order()
+    )
+    await state.set_state(SleepTime.set_days)
+
+
+@admin.callback_query(IsAdmin(), F.data == 'sleep_time_set_message')
+async def sleep_time_set_message(callback: CallbackQuery, state: FSMContext):
+    """Настройка сообщения при закрытом режиме"""
+    await callback.answer('')
+    settings = await get_settings()
+    current_message = settings.sleep_message if settings and settings.sleep_message else "Извините, такси сейчас не работает"
+    await callback.message.answer(
+        f'Текущее сообщение:\n\n{current_message}\n\n'
+        f'Отправьте новый текст (до 255 символов).',
+        reply_markup=await kb.cancel_order()
+    )
+    await state.set_state(SleepTime.set_message)
+
+
+@admin.message(IsAdmin(), SleepTime.set_start_hour, F.text)
+async def sleep_time_save_start_hour(message: Message, state: FSMContext):
+    """Сохранить час начала времени сна"""
+    input_hour = message.text.strip()
+    pattern = r"^(0|[1-9]|1[0-9]|2[0-3])$"  # 0-23
+    
+    if re.match(pattern, input_hour):
+        hour = int(input_hour)
+        await update_settings(sleep_start_hour=hour)
+        
+        # Автоматически активируем режим сна
+        time_restriction_middleware_instance.activate()
+        
+        settings = await get_settings()
+        start_minute = settings.sleep_start_minute if settings and settings.sleep_start_minute is not None else 0
+        await message.answer(f'Час начала времени сна установлен: {hour:02d}:{start_minute:02d}\n✅ Режим сна автоматически включен')
+        await state.clear()
+    else:
+        await message.answer("Пожалуйста, введите число от 0 до 23.")
+
+
+@admin.message(IsAdmin(), SleepTime.set_start_minute, F.text)
+async def sleep_time_save_start_minute(message: Message, state: FSMContext):
+    """Сохранить минуту начала времени сна"""
+    input_minute = message.text.strip()
+    pattern = r"^(0|[1-5]?[0-9])$"  # 0-59
+    
+    if re.match(pattern, input_minute):
+        minute = int(input_minute)
+        if 0 <= minute <= 59:
+            await update_settings(sleep_start_minute=minute)
+            
+            # Автоматически активируем режим сна
+            time_restriction_middleware_instance.activate()
+            
+            settings = await get_settings()
+            start_hour = settings.sleep_start_hour if settings and settings.sleep_start_hour is not None else 23
+            await message.answer(f'Минута начала времени сна установлена: {start_hour:02d}:{minute:02d}\n✅ Режим сна автоматически включен')
+            await state.clear()
+        else:
+            await message.answer("Пожалуйста, введите число от 0 до 59.")
+    else:
+        await message.answer("Пожалуйста, введите число от 0 до 59.")
+
+
+@admin.message(IsAdmin(), SleepTime.set_end_hour, F.text)
+async def sleep_time_save_end_hour(message: Message, state: FSMContext):
+    """Сохранить час окончания времени сна"""
+    input_hour = message.text.strip()
+    pattern = r"^(0|[1-9]|1[0-9]|2[0-3])$"  # 0-23
+    
+    if re.match(pattern, input_hour):
+        hour = int(input_hour)
+        await update_settings(sleep_end_hour=hour)
+        
+        # Автоматически активируем режим сна
+        time_restriction_middleware_instance.activate()
+        
+        settings = await get_settings()
+        end_minute = settings.sleep_end_minute if settings and settings.sleep_end_minute is not None else 0
+        await message.answer(f'Час окончания времени сна установлен: {hour:02d}:{end_minute:02d}\n✅ Режим сна автоматически включен')
+        await state.clear()
+    else:
+        await message.answer("Пожалуйста, введите число от 0 до 23.")
+
+
+@admin.message(IsAdmin(), SleepTime.set_end_minute, F.text)
+async def sleep_time_save_end_minute(message: Message, state: FSMContext):
+    """Сохранить минуту окончания времени сна"""
+    input_minute = message.text.strip()
+    pattern = r"^(0|[1-5]?[0-9])$"  # 0-59
+    
+    if re.match(pattern, input_minute):
+        minute = int(input_minute)
+        if 0 <= minute <= 59:
+            await update_settings(sleep_end_minute=minute)
+            
+            # Автоматически активируем режим сна
+            time_restriction_middleware_instance.activate()
+            
+            settings = await get_settings()
+            end_hour = settings.sleep_end_hour if settings and settings.sleep_end_hour is not None else 7
+            await message.answer(f'Минута окончания времени сна установлена: {end_hour:02d}:{minute:02d}\n✅ Режим сна автоматически включен')
+            await state.clear()
+        else:
+            await message.answer("Пожалуйста, введите число от 0 до 59.")
+    else:
+        await message.answer("Пожалуйста, введите число от 0 до 59.")
+
+
+@admin.message(IsAdmin(), SleepTime.set_days, F.text)
+async def sleep_time_save_days(message: Message, state: FSMContext):
+    """Сохранить дни недели для режима сна"""
+    raw = message.text.replace(' ', '')
+    pattern = r"^[1-7](,[1-7])*$"
+    if re.match(pattern, raw):
+        days_input = raw.split(',')
+        # Преобразуем 1-7 в 0-6 для weekday()
+        days = sorted({int(day) - 1 for day in days_input})
+        await update_settings(sleep_days=days)
+        
+        # Автоматически активируем режим сна
+        time_restriction_middleware_instance.activate()
+        
+        await message.answer(f'Дни сохранены: {format_sleep_days(days)}\n✅ Режим сна автоматически включен')
+        await state.clear()
+    else:
+        await message.answer("Введите числа 1-7 через запятую. Пример: 1,2,3,4,5")
+
+
+@admin.message(IsAdmin(), SleepTime.set_message, F.text)
+async def sleep_time_save_message(message: Message, state: FSMContext):
+    """Сохранить сообщение для режима сна"""
+    text = message.text.strip()
+    if len(text) > 255:
+        await message.answer("Сообщение слишком длинное. Максимум 255 символов.")
+        return
+    await update_settings(sleep_message=text)
+    
+    # Автоматически активируем режим сна
+    time_restriction_middleware_instance.activate()
+    
+    await message.answer(f'Сообщение сохранено:\n{text}\n✅ Режим сна автоматически включен')
+    await state.clear()
 
 
 # ------------------Меню машин-----------------------
@@ -1329,3 +1771,116 @@ async def save_free_cities(callback: CallbackQuery, state: FSMContext):
     )
     
     await state.clear()
+
+
+# ------------------Принятие заказа админом---------------
+@admin.callback_query(IsAdmin(), F.data.startswith('accept_'))
+async def admin_accept_order(callback: CallbackQuery, bot: Bot, state: FSMContext):
+    """Обработчик принятия заказа админом"""
+    await callback.answer('')
+    try:
+        order_id = await get_all_orders(callback.data.split('_')[1])
+        if not order_id:
+            await callback.message.edit_text('Заказ не найден')
+            return
+        
+        # Проверяем, есть ли админ в таблице водителей
+        driver = await get_driver(callback.from_user.id)
+        
+        if not driver:
+            await callback.answer(
+                "Вы не добавлены как водитель. Добавьте себя через меню 'Автомобили' → 'Добавить'",
+                show_alert=True
+            )
+            return
+        
+        # Проверяем баланс (если нужно)
+        if driver.price <= 0:
+            await callback.answer(
+                "Вы не можете принять заказ, так как у вас недостаточно средств на балансе.",
+                show_alert=True
+            )
+            return
+        
+        # Обновляем баланс водителя
+        await update_driver(callback.from_user.id, price=int(driver.price - int(order_id.price * 0.10)))
+        
+        # Обновляем сообщение
+        await callback.message.edit_text(
+            text=f'Номер заказа - <b><code>{order_id.id}</code></b>\n'
+                 f'Админ {driver.name} принял заказ',
+            reply_markup=await kb.go_to_order()
+        )
+        
+        # Создаем запись о начале выполнения заказа
+        try:
+            await start_order_execution(order_id.id, driver.id)
+            # Удаляем сообщение у пользователя
+            message_id_pass = order_id.chat_id_user
+            if message_id_pass:
+                try:
+                    await bot.delete_message(chat_id=order_id.user_rel.tg_id, message_id=message_id_pass)
+                except TelegramBadRequest as e:
+                    if "message to delete not found" not in str(e).lower():
+                        print(f"Ошибка удаления сообщения: {e}")
+        except Exception as e:
+            print(f"Ошибка при создании записи о заказе: {e}")
+        
+        # Отправляем сообщение пользователю
+        try:
+            message_pass = await bot.send_photo(
+                chat_id=order_id.user_rel.tg_id,
+                photo=driver.photo_car,
+                caption=f'🤝<b>ВАШ ЗАКАЗ ПРИНЯТ</b>\n'
+                        f'👤{driver.name} на {driver.car_name}\n'
+                        f'🚕Номер авто: {driver.number_car}\n'
+                        f'📞Телефон: {driver.phone}\n'
+                        f'💰Цена поездки: {order_id.price} руб\n'
+            )
+        except Exception as e:
+            print(f"Ошибка отправки сообщения пользователю: {e}")
+            message_pass = None
+        
+        # Отправляем детали заказа админу
+        text_driver = (f"Заказ <b>{order_id.id}</b>\n\n"
+                      f"Телефон <b>{order_id.user_rel.phone}</b>\n\n"
+                      f"📍:<b>{order_id.city1_id} - {order_id.address1_id.upper()}</b>\n\n"
+                      f"📍:<b>{order_id.city2_id} - {order_id.address2_id.upper()}</b>\n\n")
+        if order_id.add_address:
+            text_driver += f"🔃<b>{order_id.add_address}</b>\n\n"
+        if order_id.add_new_address1:
+            text_driver += f'📍: <b>{order_id.add_new_address1} - {order_id.add_street_address1.upper()}</b>\n\n'
+        if order_id.add_new_address2:
+            text_driver += f'📍: <b>{order_id.add_new_address2} - {order_id.add_street_address2.upper()}</b>\n\n'
+        text_driver += (f"Цена: <b>{order_id.price}Р</b>\n\n"
+                       f'⌚ Выберите время подачи: ⬇️')
+        
+        try:
+            message_driver = await bot.send_message(
+                chat_id=callback.from_user.id,
+                text=text_driver,
+                reply_markup=await kb.time_wait(order_id.id)
+            )
+            # Записываем в БД
+            if message_pass:
+                await set_chat_id_driver(order_id.id, message_pass.message_id)
+            await set_chat_id_user(order_id.id, chat_id_driver=str(message_driver.message_id))
+            
+            # Обновляем сообщение у пользователя
+            if message_pass:
+                await bot.edit_message_reply_markup(
+                    chat_id=order_id.user_rel.tg_id,
+                    message_id=message_pass.message_id,
+                    reply_markup=await kb.delete_order(order_id.id)
+                )
+        except Exception as e:
+            print(f"Ошибка отправки деталей заказа: {e}")
+            
+    except AttributeError:
+        await callback.answer('')
+        await callback.message.edit_text('Пассажир отменил заказ')
+    except Exception as e:
+        await callback.answer('Ошибка при принятии заказа', show_alert=True)
+        print(f"Ошибка в admin_accept_order: {e}")
+        import traceback
+        traceback.print_exc()

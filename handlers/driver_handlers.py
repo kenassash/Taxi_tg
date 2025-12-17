@@ -10,6 +10,7 @@ from datetime import datetime, timedelta
 
 from app.database.requests import get_all_orders, get_driver, delete_order_execution, delete_order_pass, \
     get_order_driver, save_free_ride, set_chat_id_driver, set_chat_id_user, update_driver, get_settings
+from app.driver_activity_check import mark_driver_responded
 from app.dialog.states import StartOrder
 from filters.chat_type import ChatTypeFilter
 from app.change_price import Settings
@@ -331,3 +332,40 @@ async def driver_lk(message: Message, bot: Bot):
     await bot.send_photo(chat_id=message.from_user.id,
                          photo=driver_id.photo_car,
                          caption=text_driver)
+
+
+# ------------------Обработка ответа водителя на проверку активности---------------
+@driver_router.callback_query(F.data == 'driver_activity_yes')
+async def driver_activity_yes(callback: CallbackQuery, bot: Bot):
+    """Водитель подтвердил активность"""
+    await callback.answer('')
+    driver = await get_driver(callback.from_user.id)
+    if not driver:
+        await callback.message.edit_text('Ошибка: вы не найдены в системе водителей')
+        return
+    
+    # Отмечаем, что водитель ответил
+    mark_driver_responded(callback.from_user.id)
+    
+    # Устанавливаем активность
+    await update_driver(callback.from_user.id, active=True)
+    
+    await callback.message.edit_text('✅ <b>Вы подтвердили активность</b>\n\nВы остаетесь на линии.')
+
+
+@driver_router.callback_query(F.data == 'driver_activity_no')
+async def driver_activity_no(callback: CallbackQuery, bot: Bot):
+    """Водитель подтвердил неактивность"""
+    await callback.answer('')
+    driver = await get_driver(callback.from_user.id)
+    if not driver:
+        await callback.message.edit_text('Ошибка: вы не найдены в системе водителей')
+        return
+    
+    # Отмечаем, что водитель ответил
+    mark_driver_responded(callback.from_user.id)
+    
+    # Устанавливаем неактивность
+    await update_driver(callback.from_user.id, active=False)
+    
+    await callback.message.edit_text('🔴 <b>Вы переведены в неактивный статус</b>\n\nДля возврата на линию нажмите /start и выберите "Активен"')

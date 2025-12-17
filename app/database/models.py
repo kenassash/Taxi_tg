@@ -137,6 +137,14 @@ class SettingModel(Base):
     night_tariff_end_hour: Mapped[int] = mapped_column(Integer, nullable=True, default=7)  # Час окончания ночного тарифа (0-23)
     night_tariff_end_minute: Mapped[int] = mapped_column(Integer, nullable=True, default=0)  # Минута окончания ночного тарифа (0-59)
     night_tariff_price: Mapped[int] = mapped_column(Integer, nullable=True, default=50)  # Сумма изменения цены при ночном тарифе
+    sleep_start_hour: Mapped[int] = mapped_column(Integer, nullable=True, default=23)  # Час начала времени сна (0-23)
+    sleep_start_minute: Mapped[int] = mapped_column(Integer, nullable=True, default=0)  # Минута начала времени сна (0-59)
+    sleep_end_hour: Mapped[int] = mapped_column(Integer, nullable=True, default=7)  # Час окончания времени сна (0-23)
+    sleep_end_minute: Mapped[int] = mapped_column(Integer, nullable=True, default=0)  # Минута окончания времени сна (0-59)
+    sleep_days: Mapped[List[int] | None] = mapped_column(JSON, nullable=True)  # Дни недели, когда действует режим сна (0=Пн ... 6=Вс)
+    sleep_message: Mapped[str] = mapped_column(String(255), nullable=True)  # Сообщение при закрытом режиме
+    driver_check_interval_hours: Mapped[int] = mapped_column(Integer, nullable=True, default=2)  # Интервал проверки активности водителей (часы)
+    driver_inactive_timeout_minutes: Mapped[int] = mapped_column(Integer, nullable=True, default=10)  # Таймаут без ответа (минуты)
 
 
 class OnlineExecution(Base):

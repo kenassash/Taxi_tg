@@ -36,6 +36,8 @@ async def get_role_driver(
             text = f'<b>Добро пожаловать, Таксист {event_from_user.full_name}</b>😊\n\n'
             dialog_manager.dialog_data["driver_info"] = driver
 
+            show_driver_status = bool(status and status.auto_distribution)
+
             if status.free_ride:
                 if user.free_ride == 0:
                     text += f'Поздравляем! У вас бесплатная поездка 🎉'
@@ -53,6 +55,7 @@ async def get_role_driver(
                     "paid_free_selected": dialog_manager.dialog_data.get("paid_free_selected", False),
                     "driver_status_items": driver_status_items,
                     "driver_active": driver.active,
+                    "show_driver_status": show_driver_status,
                 }
                 print(dialog_manager.dialog_data)
                 return data
@@ -61,13 +64,16 @@ async def get_role_driver(
                 'text': text,
                 "is_driver": bool(driver),
                 "driver_status_items": driver_status_items,
-                "driver_active": driver.active
+                "driver_active": driver.active,
+                "show_driver_status": show_driver_status,
             }
             return data
 
         else:
             # Обычные пользователи (не водители)
             text = f'<b>Добро пожаловать, {event_from_user.full_name}!</b> 😊\n\n'
+
+            show_driver_status = bool(status and status.auto_distribution)
 
             if status.free_ride:
                 if user.free_ride == 0:
@@ -86,6 +92,7 @@ async def get_role_driver(
                     "paid_free_selected": dialog_manager.dialog_data.get("paid_free_selected", False),
                     "driver_status_items": driver_status_items,
                     "driver_active": False,
+                    "show_driver_status": show_driver_status,
                 }
                 print(dialog_manager.dialog_data)
                 return data
@@ -96,7 +103,8 @@ async def get_role_driver(
                 "paid_free_items": paid_free_items,  # ✅ Добавил
                 "paid_free": bool(user.paid_free),  # ✅ Добавил
                 "driver_status_items": driver_status_items,
-                "driver_active": False
+                "driver_active": False,
+                "show_driver_status": show_driver_status,
             }
             return data
 
@@ -106,6 +114,7 @@ async def get_role_driver(
             'text': text,
             "paid_free_items": paid_free_items,  # ✅ Добавил
             "paid_free": False,  # ✅ Добавил
+            "show_driver_status": False,
         }
         return data
 

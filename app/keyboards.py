@@ -89,6 +89,14 @@ async def on_the_spot_kb(order_id, message_id):
     return keyboard.adjust(1, 1, 1).as_markup()
 
 
+async def driver_activity_check():
+    """Клавиатура для проверки активности водителя"""
+    keyboard = InlineKeyboardBuilder()
+    keyboard.add(InlineKeyboardButton(text='🟢 Активен', callback_data='driver_activity_yes'))
+    keyboard.add(InlineKeyboardButton(text='🔴 Неактивен', callback_data='driver_activity_no'))
+    return keyboard.adjust(2).as_markup()
+
+
 async def time_wait(order_id):
     keyboard = InlineKeyboardBuilder()
     keyboard.add(InlineKeyboardButton(text='3 мин.', callback_data=f'timewait_{order_id}_3'))

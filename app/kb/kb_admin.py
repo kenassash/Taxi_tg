@@ -49,7 +49,9 @@ def admin_keyboard(
         'Пользователи': 'number_passeger',
         'Бан': 'ban_user',
         'Время сна': 'time_restriction',
-        'Запрет водителю': 'driver_block',
+        'Активность водителей': 'driver_block',
+        'Список водителей': 'drivers_list',
+        'Интервал смс': 'driver_activity',
         'Инф-ия о заказе': 'info_order',
         'Ночной тариф': 'nightchange',
         'Настройка бесплатных': 'freeorder',
@@ -74,8 +76,31 @@ async def turn_time_rest():
     keyboard = InlineKeyboardBuilder()
     keyboard.add(InlineKeyboardButton(text='Включить', callback_data='turntimerest_YES'))
     keyboard.add(InlineKeyboardButton(text='Отключить', callback_data='turntimerest_NO'))
+    keyboard.add(InlineKeyboardButton(text='Настроить время', callback_data='sleep_time_set_time'))
     keyboard.add(InlineKeyboardButton(text='Отменить', callback_data=f'cancelorder_'))
     return keyboard.adjust(2).as_markup()
+
+
+async def sleep_time_kb():
+    """Клавиатура для настройки времени сна"""
+    keyboard = InlineKeyboardBuilder()
+    keyboard.add(InlineKeyboardButton(text='Изменить час начала', callback_data='sleep_time_set_start_hour'))
+    keyboard.add(InlineKeyboardButton(text='Изменить минуту начала', callback_data='sleep_time_set_start_minute'))
+    keyboard.add(InlineKeyboardButton(text='Изменить час окончания', callback_data='sleep_time_set_end_hour'))
+    keyboard.add(InlineKeyboardButton(text='Изменить минуту окончания', callback_data='sleep_time_set_end_minute'))
+    keyboard.add(InlineKeyboardButton(text='Изменить дни недели', callback_data='sleep_time_set_days'))
+    keyboard.add(InlineKeyboardButton(text='Изменить сообщение', callback_data='sleep_time_set_message'))
+    keyboard.add(InlineKeyboardButton(text='Назад', callback_data='time_restriction'))
+    return keyboard.adjust(1).as_markup()
+
+
+async def driver_activity_kb():
+    """Клавиатура для настройки интервалов проверки активности водителей"""
+    keyboard = InlineKeyboardBuilder()
+    keyboard.add(InlineKeyboardButton(text='Изменить интервал (часы)', callback_data='driver_activity_set_interval'))
+    keyboard.add(InlineKeyboardButton(text='Изменить таймаут (минуты)', callback_data='driver_activity_set_timeout'))
+    keyboard.add(InlineKeyboardButton(text='Назад', callback_data='admin_back'))
+    return keyboard.adjust(1).as_markup()
 
 
 async def car_menu_keyboard():
@@ -189,8 +214,8 @@ async def send_to_user():
 
 async def button_deactive():
     keyboard = InlineKeyboardBuilder()
-    keyboard.add(InlineKeyboardButton(text='Заблокировать', callback_data=f'blockdrive_YES'))
-    keyboard.add(InlineKeyboardButton(text='Разблокировать', callback_data=f'blockdrive_NO'))
+    keyboard.add(InlineKeyboardButton(text='Не активен', callback_data=f'blockdrive_YES'))
+    keyboard.add(InlineKeyboardButton(text='Активен', callback_data=f'blockdrive_NO'))
     keyboard.add(InlineKeyboardButton(text='Отменить', callback_data=f'cancelorder_'))
     return keyboard.adjust(2).as_markup()
 

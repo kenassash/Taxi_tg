@@ -74,7 +74,7 @@ start_menu_order = Dialog(
             id="driver_status_id",
             item_id_getter=operator.itemgetter(1),
             items="driver_status_items",
-            when=F["is_driver"],  # Показываем только водителям
+            when=(F["is_driver"] & F["show_driver_status"]),  # Показываем только водителям и когда авто-распределение включено
             on_state_changed=on_driver_status_changed,  # Нужно создать эту функцию
         ),
         Button(
