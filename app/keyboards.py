@@ -171,3 +171,11 @@ async def add_car_or_no(id):
     keyboard.add(InlineKeyboardButton(text='Принять', callback_data=f'addcaradmin_{id}_YES'))
     keyboard.add(InlineKeyboardButton(text='Отказаться', callback_data=f'addcaradmin_{id}_NO'))
     return keyboard.adjust().as_markup()
+
+
+async def paid_free_choice():
+    """Клавиатура для выбора платной или бесплатной поездки"""
+    keyboard = InlineKeyboardBuilder()
+    keyboard.add(InlineKeyboardButton(text='💰 Платно', callback_data='paid_free_2'))
+    keyboard.add(InlineKeyboardButton(text='🎁 Бесплатно', callback_data='paid_free_1'))
+    return keyboard.adjust(2).as_markup()

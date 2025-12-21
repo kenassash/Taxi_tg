@@ -198,7 +198,7 @@ async def no_active(driver_id, is_start=False):
 
 async def get_all_car():
     async with async_session() as session:
-        driver = await session.scalars(select(Driver))
+        driver = await session.scalars(select(Driver).order_by(Driver.id))
         return driver
 
 
@@ -517,14 +517,24 @@ async def update_users(tg_id: int, **values: Any):
                               .values(**values))
         await session.commit()
 
-async def get_next_available_driver():
-    """Получить следующего доступного водителя по счетчику"""
+async def get_next_available_driver(exclude_driver_id: int = None):
+    """Получить следующего доступного водителя по счетчику
+    
+    Args:
+        exclude_driver_id: ID водителя (tg_id), которого нужно исключить из поиска
+    """
     async with async_session() as session:
         # Получаем водителя с False (не получал заказ) или NULL
-        query = select(Driver).where(
+        conditions = [
             Driver.active == True,
             (Driver.order_count == False) | (Driver.order_count == None)
-        ).order_by(Driver.id.asc())
+        ]
+        
+        # Исключаем указанного водителя, если он передан
+        if exclude_driver_id is not None:
+            conditions.append(Driver.tg_id != exclude_driver_id)
+        
+        query = select(Driver).where(*conditions).order_by(Driver.id.asc())
         
         result = await session.execute(query)
         driver = result.scalars().first()

@@ -303,20 +303,50 @@ async def drivers_list(callback: CallbackQuery):
 @admin.callback_query(IsAdmin(), F.data == 'time_restriction')
 async def time_restriction(callback: CallbackQuery):
     await callback.answer('')
-    await callback.message.answer('Действие 💤', reply_markup=await kb_admin.turn_time_rest())
+    settings = await get_settings()
+    sleep_manual_active = settings.sleep_manual_active if settings else False
+    sleep_time_active = time_restriction_middleware_instance.active
+    await callback.message.answer('Действие 💤', reply_markup=await kb_admin.turn_time_rest(sleep_manual_active, sleep_time_active))
+
+
+@admin.callback_query(IsAdmin(), F.data.startswith('sleep_manual_'))
+async def turn_sleep_manual(callback: CallbackQuery):
+    """Включение/выключение мгновенного сна (без времени)"""
+    await callback.answer('')
+    action = callback.data.split('_')[2]
+    
+    if action == 'ON':
+        await update_settings(sleep_manual_active=True)
+        await callback.message.answer("✅ Мгновенный сон включен. Такси заблокировано сразу.")
+    elif action == 'OFF':
+        await update_settings(sleep_manual_active=False)
+        await callback.message.answer("❌ Мгновенный сон выключен.")
+    
+    # Обновляем клавиатуру с новым статусом
+    settings = await get_settings()
+    sleep_manual_active = settings.sleep_manual_active if settings else False
+    sleep_time_active = time_restriction_middleware_instance.active
+    await callback.message.edit_reply_markup(reply_markup=await kb_admin.turn_time_rest(sleep_manual_active, sleep_time_active))
 
 
 @admin.callback_query(IsAdmin(), F.data.startswith('turntimerest_'))
 async def turn_or_of_timerest(callback: CallbackQuery):
+    """Включение/выключение сна по времени"""
     await callback.answer('')
     answer = callback.data.split('_')[1]
 
     if answer == 'YES':
         time_restriction_middleware_instance.activate()
-        await callback.message.answer("Ограничение времени отправки сообщений активировано.")
+        await callback.message.answer("✅ Сон по времени включен.")
     elif answer == 'NO':
         time_restriction_middleware_instance.deactivate()
-        await callback.message.answer("Ограничение времени отправки сообщений деактивировано.")
+        await callback.message.answer("❌ Сон по времени выключен.")
+    
+    # Обновляем клавиатуру с новым статусом
+    settings = await get_settings()
+    sleep_manual_active = settings.sleep_manual_active if settings else False
+    sleep_time_active = time_restriction_middleware_instance.active
+    await callback.message.edit_reply_markup(reply_markup=await kb_admin.turn_time_rest(sleep_manual_active, sleep_time_active))
 
 
 WEEKDAY_LABELS = {
@@ -481,12 +511,9 @@ async def sleep_time_save_start_hour(message: Message, state: FSMContext):
         hour = int(input_hour)
         await update_settings(sleep_start_hour=hour)
         
-        # Автоматически активируем режим сна
-        time_restriction_middleware_instance.activate()
-        
         settings = await get_settings()
         start_minute = settings.sleep_start_minute if settings and settings.sleep_start_minute is not None else 0
-        await message.answer(f'Час начала времени сна установлен: {hour:02d}:{start_minute:02d}\n✅ Режим сна автоматически включен')
+        await message.answer(f'Час начала времени сна установлен: {hour:02d}:{start_minute:02d}')
         await state.clear()
     else:
         await message.answer("Пожалуйста, введите число от 0 до 23.")
@@ -503,12 +530,9 @@ async def sleep_time_save_start_minute(message: Message, state: FSMContext):
         if 0 <= minute <= 59:
             await update_settings(sleep_start_minute=minute)
             
-            # Автоматически активируем режим сна
-            time_restriction_middleware_instance.activate()
-            
             settings = await get_settings()
             start_hour = settings.sleep_start_hour if settings and settings.sleep_start_hour is not None else 23
-            await message.answer(f'Минута начала времени сна установлена: {start_hour:02d}:{minute:02d}\n✅ Режим сна автоматически включен')
+            await message.answer(f'Минута начала времени сна установлена: {start_hour:02d}:{minute:02d}')
             await state.clear()
         else:
             await message.answer("Пожалуйста, введите число от 0 до 59.")
@@ -526,12 +550,9 @@ async def sleep_time_save_end_hour(message: Message, state: FSMContext):
         hour = int(input_hour)
         await update_settings(sleep_end_hour=hour)
         
-        # Автоматически активируем режим сна
-        time_restriction_middleware_instance.activate()
-        
         settings = await get_settings()
         end_minute = settings.sleep_end_minute if settings and settings.sleep_end_minute is not None else 0
-        await message.answer(f'Час окончания времени сна установлен: {hour:02d}:{end_minute:02d}\n✅ Режим сна автоматически включен')
+        await message.answer(f'Час окончания времени сна установлен: {hour:02d}:{end_minute:02d}')
         await state.clear()
     else:
         await message.answer("Пожалуйста, введите число от 0 до 23.")
@@ -548,12 +569,9 @@ async def sleep_time_save_end_minute(message: Message, state: FSMContext):
         if 0 <= minute <= 59:
             await update_settings(sleep_end_minute=minute)
             
-            # Автоматически активируем режим сна
-            time_restriction_middleware_instance.activate()
-            
             settings = await get_settings()
             end_hour = settings.sleep_end_hour if settings and settings.sleep_end_hour is not None else 7
-            await message.answer(f'Минута окончания времени сна установлена: {end_hour:02d}:{minute:02d}\n✅ Режим сна автоматически включен')
+            await message.answer(f'Минута окончания времени сна установлена: {end_hour:02d}:{minute:02d}')
             await state.clear()
         else:
             await message.answer("Пожалуйста, введите число от 0 до 59.")
@@ -572,10 +590,7 @@ async def sleep_time_save_days(message: Message, state: FSMContext):
         days = sorted({int(day) - 1 for day in days_input})
         await update_settings(sleep_days=days)
         
-        # Автоматически активируем режим сна
-        time_restriction_middleware_instance.activate()
-        
-        await message.answer(f'Дни сохранены: {format_sleep_days(days)}\n✅ Режим сна автоматически включен')
+        await message.answer(f'Дни сохранены: {format_sleep_days(days)}')
         await state.clear()
     else:
         await message.answer("Введите числа 1-7 через запятую. Пример: 1,2,3,4,5")
@@ -590,10 +605,7 @@ async def sleep_time_save_message(message: Message, state: FSMContext):
         return
     await update_settings(sleep_message=text)
     
-    # Автоматически активируем режим сна
-    time_restriction_middleware_instance.activate()
-    
-    await message.answer(f'Сообщение сохранено:\n{text}\n✅ Режим сна автоматически включен')
+    await message.answer(f'Сообщение сохранено:\n{text}')
     await state.clear()
 
 
@@ -1777,11 +1789,10 @@ async def save_free_cities(callback: CallbackQuery, state: FSMContext):
 @admin.callback_query(IsAdmin(), F.data.startswith('accept_'))
 async def admin_accept_order(callback: CallbackQuery, bot: Bot, state: FSMContext):
     """Обработчик принятия заказа админом"""
-    await callback.answer('')
     try:
         order_id = await get_all_orders(callback.data.split('_')[1])
         if not order_id:
-            await callback.message.edit_text('Заказ не найден')
+            await callback.answer('Заказ не найден', show_alert=True)
             return
         
         # Проверяем, есть ли админ в таблице водителей
@@ -1794,13 +1805,16 @@ async def admin_accept_order(callback: CallbackQuery, bot: Bot, state: FSMContex
             )
             return
         
-        # Проверяем баланс (если нужно)
+        # Проверяем баланс ПЕРЕД ответом на callback
         if driver.price <= 0:
             await callback.answer(
                 "Вы не можете принять заказ, так как у вас недостаточно средств на балансе.",
                 show_alert=True
             )
             return
+        
+        # Если все проверки пройдены, отвечаем на callback
+        await callback.answer('')
         
         # Обновляем баланс водителя
         await update_driver(callback.from_user.id, price=int(driver.price - int(order_id.price * 0.10)))

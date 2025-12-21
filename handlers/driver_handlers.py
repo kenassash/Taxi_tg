@@ -242,16 +242,19 @@ async def finish(callback: CallbackQuery, bot: Bot, dialog_manager: DialogManage
                         print("Сообщение уже удалено или не найдено.")
                     else:
                         raise e
-                await bot.send_message(chat_id=order_id.user_rel.tg_id,
-                                       text=f'Поздравляем! Ваша следующая поездка будет бесплатной! 🎉',
-                                       reply_markup=await kb.main())
-
-                # await bg_manager.start(
-                #     state=StartOrder.user,  # важно!
-                #     data={"text": "🎉 Поздравляем! Ваша следующая поездка будет бесплатной!"},
-                #     # это будет в Format('{text}')
-                #     mode=StartMode.RESET_STACK,
-                # )
+                
+                # Отправляем поздравление
+                await bot.send_message(
+                    chat_id=order_id.user_rel.tg_id,
+                    text=f'🎉 <b>Поздравляем! Ваша следующая поездка будет бесплатной!</b> 🎉\n\n'
+                         f'Выберите тип поездки:'
+                )
+                
+                # Запускаем диалог для выбора платно/бесплатно
+                await bg_manager.start(
+                    state=StartOrder.user,
+                    mode=StartMode.RESET_STACK,
+                )
             else:
                 free_ride = user_free_ride
                 await save_free_ride(order_id.user_rel.tg_id, free_ride, paid_free_bool=False)
@@ -317,18 +320,23 @@ async def finish(callback: CallbackQuery, bot: Bot, dialog_manager: DialogManage
 @driver_router.message(Command('driver'))
 async def driver_lk(message: Message, bot: Bot):
     driver_id = await get_driver(message.from_user.id)
-    if driver_id.active:
-        status_text = "🟢 На линии"
-    else:
-        status_text = "🔴 Не на линии"
-    text_driver = (f"Здравствуйте, {driver_id.name}\n\n"
-                   f"<b>Автомобиль: </b>{driver_id.car_name}, {driver_id.number_car}\n"
-                   # f"<b>Статус: </b>{status_text}\n"
-                   f"<b>Телефон: </b>{driver_id.phone}\n"
-                   f"<b>Баланс: </b> {driver_id.price}рублей\n\n"
-                   # f"<b>Бонусы</b> {driver_id.price}\n\n"
-                   # f"<b>Стоимость выхода на линию:</b> {driver_id.price}\n"
-                   f"Ночной тариф с <b>23:01</b> до <b>06:01</b>")
+    settings = await get_settings()
+    auto_distribution = settings.auto_distribution if settings else False
+    
+    text_driver = f"Здравствуйте, {driver_id.name}\n\n"
+    text_driver += f"<b>Автомобиль: </b>{driver_id.car_name}, {driver_id.number_car}\n"
+    
+    # Показываем статус только если автораспределение включено
+    if auto_distribution:
+        if driver_id.active:
+            status_text = "🟢 На линии"
+        else:
+            status_text = "🔴 Не на линии"
+        text_driver += f"<b>Статус: </b>{status_text}\n"
+    
+    text_driver += f"<b>Телефон: </b>{driver_id.phone}\n"
+    text_driver += f"<b>Баланс: </b> {driver_id.price}рублей"
+    
     await bot.send_photo(chat_id=message.from_user.id,
                          photo=driver_id.photo_car,
                          caption=text_driver)

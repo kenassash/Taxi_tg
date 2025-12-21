@@ -143,6 +143,7 @@ class SettingModel(Base):
     sleep_end_minute: Mapped[int] = mapped_column(Integer, nullable=True, default=0)  # Минута окончания времени сна (0-59)
     sleep_days: Mapped[List[int] | None] = mapped_column(JSON, nullable=True)  # Дни недели, когда действует режим сна (0=Пн ... 6=Вс)
     sleep_message: Mapped[str] = mapped_column(String(255), nullable=True)  # Сообщение при закрытом режиме
+    sleep_manual_active: Mapped[bool] = mapped_column(Boolean, default=False)  # Мгновенное включение/выключение сна (без времени)
     driver_check_interval_hours: Mapped[int] = mapped_column(Integer, nullable=True, default=2)  # Интервал проверки активности водителей (часы)
     driver_inactive_timeout_minutes: Mapped[int] = mapped_column(Integer, nullable=True, default=10)  # Таймаут без ответа (минуты)
 

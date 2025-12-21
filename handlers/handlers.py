@@ -322,3 +322,4 @@ async def cmd_start(message: Message,
                              f'Пожалуйста, отправьте свой номер телефона для регистрации c помощью кнопки:',
                              reply_markup=await kb.phone())
         await state.set_state(StartOrder.request_phone)
+

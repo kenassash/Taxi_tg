@@ -35,17 +35,20 @@ async def get_info_by_driver_handler(
     bot: Bot = manager.middleware_data["bot"]
 
     driver = manager.dialog_data["driver_info"]
-    status_text = ["🔴 Не на линии", "🟢 На линии"][driver.active]
-    text_driver = (
-        f"Здравствуйте, {driver.name}\n\n"
-        f"<b>Автомобиль: </b>{driver.car_name}, {driver.number_car}\n"
-        f"<b>Статус: </b>{status_text}\n"
-        f"<b>Телефон: </b>{driver.phone}\n"
-        f"<b>Баланс</b> {driver.price}\n\n"
-        # f"<b>Бонусы</b> {driver.price}\n\n"
-        # f"<b>Стоимость выхода на линию:</b> {driver.price}\n"
-        f"Ночной тариф с <b>23:01</b> до <b>06:01</b>"
-    )
+    settings = await get_settings()
+    auto_distribution = settings.auto_distribution if settings else False
+    
+    text_driver = f"Здравствуйте, {driver.name}\n\n"
+    text_driver += f"<b>Автомобиль: </b>{driver.car_name}, {driver.number_car}\n"
+    
+    # Показываем статус только если автораспределение включено
+    if auto_distribution:
+        status_text = ["🔴 Не на линии", "🟢 На линии"][driver.active]
+        text_driver += f"<b>Статус: </b>{status_text}\n"
+    
+    text_driver += f"<b>Телефон: </b>{driver.phone}\n"
+    text_driver += f"<b>Баланс</b> {driver.price}"
+    
     await bot.send_photo(
         chat_id=callback.from_user.id,
         photo=driver.photo_car,
@@ -261,18 +264,49 @@ async def order_now(callback: CallbackQuery,
         # Проверяем, нужно ли сбросить статусы заказов
         await check_and_reset_if_needed()
         
-        # Получаем следующего доступного водителя по статусу заказа
-        next_driver = await get_next_available_driver()
+        # Ищем водителя с достаточным балансом
+        max_attempts = 10  # Ограничиваем количество попыток
+        attempts = 0
+        next_driver = None
         
-        if not next_driver:
+        while attempts < max_attempts:
+            # Получаем следующего доступного водителя по статусу заказа
+            next_driver = await get_next_available_driver()
+            
+            if not next_driver:
+                await callback.answer(
+                    "В данный момент нет свободных водителей.",
+                    show_alert=True
+                )
+                return
+            
+            # Проверяем баланс водителя перед отправкой заказа
+            if next_driver.price <= 0:
+                # Помечаем водителя как неактивного и сбрасываем счетчик
+                await mark_driver_inactive(next_driver.tg_id)
+                from app.database.requests import async_session
+                from app.database.models import Driver
+                from sqlalchemy import update
+                async with async_session() as session:
+                    await session.execute(
+                        update(Driver)
+                        .where(Driver.tg_id == next_driver.tg_id)
+                        .values(order_count=False)
+                    )
+                    await session.commit()
+                
+                attempts += 1
+                continue  # Ищем следующего водителя
+            
+            # Нашли водителя с достаточным балансом
+            break
+        
+        if not next_driver or next_driver.price <= 0:
             await callback.answer(
-                "В данный момент нет свободных водителей.",
+                "В данный момент нет доступных водителей с достаточным балансом.",
                 show_alert=True
             )
             return
-
-        print(f"Следующий водитель: {next_driver.tg_id}")
-        print(f"Статус заказа: {'Получал заказ' if next_driver.order_count else 'Не получал заказ'}")
 
         # Пытаемся отправить заказ водителю
         try:
@@ -285,12 +319,8 @@ async def order_now(callback: CallbackQuery,
             # Помечаем водителя как получившего заказ
             await increment_driver_order_count(next_driver.tg_id)
             
-            print(f"Заказ {order_id} отправлен водителю {next_driver.tg_id}")
-            print(f"Водитель помечен как получивший заказ")
-            
         except TelegramBadRequest as e:
             if "chat not found" in str(e).lower():
-                print(f"Водитель {next_driver.tg_id} заблокировал бота")
                 # Помечаем водителя как неактивного
                 await mark_driver_inactive(next_driver.tg_id)
                 await callback.answer(
@@ -315,14 +345,12 @@ async def order_now(callback: CallbackQuery,
                         reply_markup=await kb.accept(order_id)
                     )
                 except TelegramBadRequest as e:
-                    if "chat not found" not in str(e).lower():
-                        print(f"Ошибка отправки заказа админу {admin_id}: {e}")
+                    pass
         except Exception as e:
-            print(f"Ошибка при отправке заказов админам: {e}")
+            pass
     else:
         dialog_manager.dialog_data.clear()
         dialog_manager.dialog_data['order_id'] = order_id
-        print(data_test)
         # await bg.start(data=data_test, mode=StartMode.NORMAL, state=AddOrder.upprice)
         test = await get_least_loaded_driver()
         message_id_driver = await dialog_manager.event.bot.send_message(

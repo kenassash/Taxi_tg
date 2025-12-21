@@ -72,13 +72,25 @@ def admin_keyboard(
     )
 
 
-async def turn_time_rest():
+async def turn_time_rest(sleep_manual_active: bool = False, sleep_time_active: bool = False):
+    """Клавиатура для управления режимами сна"""
     keyboard = InlineKeyboardBuilder()
-    keyboard.add(InlineKeyboardButton(text='Включить', callback_data='turntimerest_YES'))
-    keyboard.add(InlineKeyboardButton(text='Отключить', callback_data='turntimerest_NO'))
+    
+    # Мгновенный сон (без времени)
+    if sleep_manual_active:
+        keyboard.add(InlineKeyboardButton(text='💤 Сон сразу: ВКЛ', callback_data='sleep_manual_OFF'))
+    else:
+        keyboard.add(InlineKeyboardButton(text='💤 Сон сразу: ВЫКЛ', callback_data='sleep_manual_ON'))
+    
+    # Сон по времени
+    if sleep_time_active:
+        keyboard.add(InlineKeyboardButton(text='⏰ Сон по времени: ВКЛ', callback_data='turntimerest_NO'))
+    else:
+        keyboard.add(InlineKeyboardButton(text='⏰ Сон по времени: ВЫКЛ', callback_data='turntimerest_YES'))
+    
     keyboard.add(InlineKeyboardButton(text='Настроить время', callback_data='sleep_time_set_time'))
     keyboard.add(InlineKeyboardButton(text='Отменить', callback_data=f'cancelorder_'))
-    return keyboard.adjust(2).as_markup()
+    return keyboard.adjust(1).as_markup()
 
 
 async def sleep_time_kb():

@@ -76,26 +76,34 @@ class TimeRestrictionMiddleware(BaseMiddleware):
             data: Dict[str, Any],
     ) -> Any:
 
-        if not self.active:
-            return await handler(event, data)
-
         # Получаем настройки времени сна из БД
         try:
             settings = await get_settings()
             if not settings:
                 return await handler(event, data)
 
-            # Получаем настройки
+            base_message = settings.sleep_message or "Извините, такси не работает"
+
+            # Проверка 1: Мгновенный сон (без времени)
+            if settings.sleep_manual_active:
+                # Если мгновенный сон включен, всегда блокируем
+                if isinstance(event, Message):
+                    await event.answer(base_message)
+                    return
+                elif isinstance(event, CallbackQuery):
+                    await event.answer(base_message, show_alert=True)
+                    return
+
+            # Проверка 2: Сон по времени (если активен)
+            if not self.active:
+                return await handler(event, data)
+
+            # Получаем настройки времени
             start_hour = settings.sleep_start_hour if settings.sleep_start_hour is not None else 23
             start_minute = settings.sleep_start_minute if settings.sleep_start_minute is not None else 0
             end_hour = settings.sleep_end_hour if settings.sleep_end_hour is not None else 7
             end_minute = settings.sleep_end_minute if settings.sleep_end_minute is not None else 0
             days = settings.sleep_days if settings.sleep_days else list(range(7))
-            
-            # Формируем сообщение с режимом работы
-            base_message = settings.sleep_message or "Извините, такси не работает"
-            work_schedule = format_work_schedule(start_hour, start_minute, end_hour, end_minute, days)
-            block_message = f"{base_message}, {work_schedule.lower()}"
 
             start_time = time(start_hour, start_minute)
             end_time = time(end_hour, end_minute)
@@ -114,19 +122,19 @@ class TimeRestrictionMiddleware(BaseMiddleware):
                 # Время сна переходит через полночь (например, 23:00 - 07:00)
                 if current_time >= start_time or current_time < end_time:
                     if isinstance(event, Message):
-                        await event.answer(block_message)
+                        await event.answer(base_message)
                         return
                     elif isinstance(event, CallbackQuery):
-                        await event.answer(block_message, show_alert=True)
+                        await event.answer(base_message, show_alert=True)
                         return
             else:
                 # Время сна в пределах одного дня (например, 10:00 - 12:00)
                 if start_time <= current_time < end_time:
                     if isinstance(event, Message):
-                        await event.answer(block_message)
+                        await event.answer(base_message)
                         return
                     elif isinstance(event, CallbackQuery):
-                        await event.answer(block_message, show_alert=True)
+                        await event.answer(base_message, show_alert=True)
                         return
             
         except Exception as e:

@@ -14,7 +14,7 @@ from aiogram import Bot
 import app.keyboards as kb
 from app.database.requests import get_all_orders, get_driver, start_order_execution, delete_order_execution, \
     set_chat_id_driver, set_chat_id_user, update_driver, get_all_active_drivers, get_next_available_driver, \
-    increment_driver_order_count, mark_driver_inactive
+    increment_driver_order_count, mark_driver_inactive, get_settings, check_and_reset_if_needed
 from app.driver_activity_check import mark_driver_responded
 
 from middleware.driver_active_middleware import DriverActiveMiddleware
@@ -23,7 +23,6 @@ user_group_router = Router()
 user_group_router.message.filter(ChatTypeFilter(['group', 'supergroup']))
 load_dotenv()
 
-# user_group_router.message.middleware(DriverActiveMiddleware())
 user_group_router.callback_query.middleware(DriverActiveMiddleware())
 
 @user_group_router.message(CommandStart())
@@ -32,11 +31,31 @@ async def cmd_start(message: Message):
 @user_group_router.callback_query(F.data.startswith('accept_'))
 async def accept(callback: CallbackQuery, bot: Bot, state: FSMContext):
     try:
-        order_id = await get_all_orders(callback.data.split('_')[1])
-        # message_id_pass = callback.data.split('_')[2]
+        order_id_str = callback.data.split('_')[1]
+        order_id = await get_all_orders(order_id_str)
+        
+        if not order_id:
+            await callback.answer("Заказ не найден", show_alert=True)
+            return
+        
         message_id_pass = order_id.chat_id_user
         driver = await get_driver(callback.from_user.id)
-        if driver.price <= 0:
+        
+        if not driver:
+            await callback.answer(
+                "Ошибка: вы не найдены в системе водителей.",
+                show_alert=True
+            )
+            return
+        
+        # Получаем баланс до того, как объект отсоединится от сессии
+        try:
+            driver_price_raw = driver.price
+            driver_balance = driver_price_raw if driver_price_raw is not None else 0
+        except Exception as e:
+            driver_balance = 0
+        
+        if driver_balance <= 0:
             await callback.answer(
                 "Вы не можете принять заказ, так как у вас недостаточно средств на балансе.",
                 show_alert=True
@@ -101,9 +120,17 @@ async def accept(callback: CallbackQuery, bot: Bot, state: FSMContext):
 
 
 
-    except AttributeError:
+    except AttributeError as e:
+        print(f"ERROR: AttributeError caught: {e}")
+        import traceback
+        traceback.print_exc()
         await callback.answer('')
         await callback.message.edit_text('Пассажир отменил заказ')
+    except Exception as e:
+        print(f"ERROR: Unexpected exception in accept handler: {e}")
+        import traceback
+        traceback.print_exc()
+        await callback.answer("Произошла ошибка при обработке заказа", show_alert=True)
 
 
 @user_group_router.callback_query(F.data.startswith("skip_"))
@@ -140,47 +167,109 @@ async def skip_order(callback: CallbackQuery, bot: Bot, state: FSMContext) -> No
 
         text_order += f"Цена: <b>{order_data.price}Р</b>"  # ← order_data.price
 
-        # Получаем следующего доступного водителя
-        next_driver = await get_next_available_driver()
+        # Проверяем автораспределение
+        settings = await get_settings()
+        auto_distribution = settings.auto_distribution if settings else False
 
-        if not next_driver:
-            # Если нет доступных водителей, уведомляем пассажира
-            await bot.send_message(
-                chat_id=order_data.user_rel.tg_id,
-                text="К сожалению все водители отказались от заказа. Попробуйте позже."
-            )
-            return
+        if auto_distribution:
+            # Проверяем, нужно ли сбросить статусы заказов
+            await check_and_reset_if_needed()
 
-        print(f"Следующий водитель: {next_driver.tg_id}")
+            # Получаем следующего доступного водителя (исключая текущего, который пропустил)
+            next_driver = await get_next_available_driver(exclude_driver_id=current_driver_id)
+            
+            # Если не нашли другого водителя, проверяем всех (включая текущего)
+            if not next_driver:
+                next_driver = await get_next_available_driver()
+            
+            # Сбрасываем счетчик текущего водителя, чтобы он мог получить следующий заказ
+            from app.database.requests import async_session
+            from app.database.models import Driver
+            from sqlalchemy import update
+            async with async_session() as session:
+                await session.execute(
+                    update(Driver)
+                    .where(Driver.tg_id == current_driver_id)
+                    .values(order_count=False)
+                )
+                await session.commit()
 
-        # Пытаемся отправить заказ следующему водителю
-        try:
-            message_id_driver = await bot.send_message(
-                chat_id=next_driver.tg_id,
-                text=text_order,
-                reply_markup=await kb.accept_or_skip(order_id)
-            )
+            if not next_driver:
+                # Если нет доступных водителей, уведомляем пассажира
+                await bot.send_message(
+                    chat_id=order_data.user_rel.tg_id,
+                    text="К сожалению все водители отказались от заказа. Попробуйте позже."
+                )
+                return
 
-            # Помечаем водителя как получившего заказ
-            await increment_driver_order_count(next_driver.tg_id)
+            print(f"Следующий водитель: {next_driver.tg_id}")
 
-            # Обновляем данные заказа в базе
-            from app.database.requests import set_chat_id_user
-            await set_chat_id_user(order_id, driver_id=str(next_driver.tg_id),
-                                   chat_id_driver=str(message_id_driver.message_id))
-
-            print(f"Заказ {order_id} отправлен водителю {next_driver.tg_id}")
-
-        except TelegramBadRequest as e:
-            if "chat not found" in str(e).lower():
-                print(f"Водитель {next_driver.tg_id} заблокировал бота")
-                # Помечаем водителя как неактивного
+            # Проверяем баланс водителя перед отправкой заказа
+            if next_driver.price <= 0:
+                # Отправляем сообщение водителю о необходимости пополнить баланс
+                try:
+                    await bot.send_message(
+                        chat_id=next_driver.tg_id,
+                        text="⚠️ <b>Недостаточно средств на балансе</b>\n\n"
+                             "Вы не можете принимать заказы, так как ваш баланс равен нулю или отрицательный.\n\n"
+                             "Обратитесь к администратору для пополнения баланса.",
+                        parse_mode='HTML'
+                    )
+                except Exception as e:
+                    print(f"Ошибка отправки сообщения водителю {next_driver.tg_id}: {e}")
+                
+                # Помечаем водителя как неактивного и ищем следующего
                 await mark_driver_inactive(next_driver.tg_id)
-                # Пытаемся найти следующего водителя
+                # Сбрасываем счетчик этого водителя и ищем следующего
+                from app.database.requests import async_session
+                from app.database.models import Driver
+                from sqlalchemy import update
+                async with async_session() as session:
+                    await session.execute(
+                        update(Driver)
+                        .where(Driver.tg_id == next_driver.tg_id)
+                        .values(order_count=False)
+                    )
+                    await session.commit()
+                # Пытаемся найти следующего водителя (рекурсивно)
                 await skip_order(callback, bot, state)
                 return
-            else:
-                raise e
+
+            # Пытаемся отправить заказ следующему водителю
+            try:
+                message_id_driver = await bot.send_message(
+                    chat_id=next_driver.tg_id,
+                    text=text_order,
+                    reply_markup=await kb.accept_or_skip(order_id)
+                )
+
+                # Помечаем водителя как получившего заказ
+                await increment_driver_order_count(next_driver.tg_id)
+
+                # Обновляем данные заказа в базе
+                await set_chat_id_user(order_id, driver_id=str(next_driver.tg_id),
+                                       chat_id_driver=str(message_id_driver.message_id))
+
+                print(f"Заказ {order_id} отправлен водителю {next_driver.tg_id}")
+
+            except TelegramBadRequest as e:
+                if "chat not found" in str(e).lower():
+                    print(f"Водитель {next_driver.tg_id} заблокировал бота")
+                    # Помечаем водителя как неактивного
+                    await mark_driver_inactive(next_driver.tg_id)
+                    # Пытаемся найти следующего водителя
+                    await skip_order(callback, bot, state)
+                    return
+                else:
+                    raise e
+        else:
+            # Если автораспределение выключено, отправляем заказ в группу
+            message_id_driver = await bot.send_message(
+                chat_id=os.getenv('CHAT_GROUP_ID'),
+                text=text_order,
+                reply_markup=await kb.accept(order_id)
+            )
+            await set_chat_id_user(order_id, chat_id_driver=str(message_id_driver.message_id))
 
     except Exception as e:
         print(f"Ошибка в skip_order: {e}")
