@@ -82,19 +82,18 @@ class TimeRestrictionMiddleware(BaseMiddleware):
             if not settings:
                 return await handler(event, data)
 
-            base_message = settings.sleep_message or "Извините, такси не работает"
-
-            # Проверка 1: Мгновенный сон (без времени)
+            # Проверка 1: Мгновенный сон (без времени) - фиксированное сообщение
             if settings.sleep_manual_active:
-                # Если мгновенный сон включен, всегда блокируем
+                # Если мгновенный сон включен, всегда блокируем с фиксированным сообщением
+                fixed_message = "Извините, временно недоступно."
                 if isinstance(event, Message):
-                    await event.answer(base_message)
+                    await event.answer(fixed_message)
                     return
                 elif isinstance(event, CallbackQuery):
-                    await event.answer(base_message, show_alert=True)
+                    await event.answer(fixed_message, show_alert=True)
                     return
 
-            # Проверка 2: Сон по времени (если активен)
+            # Проверка 2: Сон по времени (если активен) - настраиваемое сообщение
             if not self.active:
                 return await handler(event, data)
 
@@ -103,39 +102,58 @@ class TimeRestrictionMiddleware(BaseMiddleware):
             start_minute = settings.sleep_start_minute if settings.sleep_start_minute is not None else 0
             end_hour = settings.sleep_end_hour if settings.sleep_end_hour is not None else 7
             end_minute = settings.sleep_end_minute if settings.sleep_end_minute is not None else 0
-            days = settings.sleep_days if settings.sleep_days else list(range(7))
-
-            start_time = time(start_hour, start_minute)
-            end_time = time(end_hour, end_minute)
+            days = settings.sleep_days if settings.sleep_days else None
+            
+            # Для сна по времени используем настраиваемое сообщение
+            time_message = settings.sleep_message or "Извините, такси сейчас не работает"
 
             # Получение текущего времени и дня в заданном часовом поясе
             now = datetime.now(self.timezone)
             current_time = now.time()
             current_weekday = now.weekday()  # 0=Пн ... 6=Вс
 
-            # Если текущий день не в списке, пропускаем проверку
-            if current_weekday not in days:
+            # Если список дней не задан, такси работает всегда
+            if days is None or len(days) == 0:
                 return await handler(event, data)
+
+            # Если текущий день НЕ в списке рабочих дней - это выходной (такси закрыто весь день)
+            if current_weekday not in days:
+                if isinstance(event, Message):
+                    await event.answer(time_message)
+                    return
+                elif isinstance(event, CallbackQuery):
+                    await event.answer(time_message, show_alert=True)
+                    return
+
+            # Если день в списке рабочих дней - проверяем время сна
+            start_time = time(start_hour, start_minute)
+            end_time = time(end_hour, end_minute)
 
             # Проверяем, находится ли текущее время в диапазоне времени сна
             if start_time >= end_time:
-                # Время сна переходит через полночь (например, 23:00 - 07:00)
+                # Время сна переходит через полночь (например, 22:52 - 22:09)
+                # Сон: с 22:52 до 22:09 следующего дня
+                # Работа: с 22:09 до 22:52
                 if current_time >= start_time or current_time < end_time:
+                    # Сейчас время сна - такси не работает
                     if isinstance(event, Message):
-                        await event.answer(base_message)
+                        await event.answer(time_message)
                         return
                     elif isinstance(event, CallbackQuery):
-                        await event.answer(base_message, show_alert=True)
+                        await event.answer(time_message, show_alert=True)
                         return
+                # Иначе - время работы, такси работает
             else:
                 # Время сна в пределах одного дня (например, 10:00 - 12:00)
                 if start_time <= current_time < end_time:
+                    # Сейчас время сна - такси не работает
                     if isinstance(event, Message):
-                        await event.answer(base_message)
+                        await event.answer(time_message)
                         return
                     elif isinstance(event, CallbackQuery):
-                        await event.answer(base_message, show_alert=True)
+                        await event.answer(time_message, show_alert=True)
                         return
+                # Иначе - время работы, такси работает
             
         except Exception as e:
             # В случае ошибки пропускаем проверку

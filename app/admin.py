@@ -381,16 +381,46 @@ async def sleep_time_set_time(callback: CallbackQuery):
     end_hour = settings.sleep_end_hour if settings.sleep_end_hour is not None else 7
     end_minute = settings.sleep_end_minute if settings.sleep_end_minute is not None else 0
     days_text = format_sleep_days(settings.sleep_days)
-    message_text = settings.sleep_message or "Извините, такси сейчас не работает"
+    message_text = settings.sleep_message if settings.sleep_message else "(не задано)"
     
     print(f'Текущие настройки времени сна: начало {start_hour:02d}:{start_minute:02d}, окончание {end_hour:02d}:{end_minute:02d}')
     
-    text = (f"<b>Настройка времени сна</b>\n\n"
-            f"Текущее время:\n"
-            f"Начало: {start_hour:02d}:{start_minute:02d}\n"
-            f"Окончание: {end_hour:02d}:{end_minute:02d}\n"
-            f"Дни: {days_text}\n"
-            f"Сообщение: {message_text}\n\n"
+    # Формируем информацию о рабочих и выходных днях
+    if settings.sleep_days:
+        # Рабочие дни - это дни, которые В списке sleep_days (такси работает, кроме времени сна)
+        work_days_set = sorted(settings.sleep_days)
+        work_days_text = ", ".join([WEEKDAY_LABELS[d] for d in work_days_set])
+        
+        # Выходные дни - это дни, которых НЕТ в списке sleep_days (такси закрыто весь день)
+        all_days = set(range(7))
+        weekend_days_set = sorted(all_days - set(settings.sleep_days))
+        if weekend_days_set:
+            weekend_days_text = ", ".join([WEEKDAY_LABELS[d] for d in weekend_days_set])
+        else:
+            weekend_days_text = "Нет выходных"
+    else:
+        work_days_text = "Все дни"
+        weekend_days_text = "Нет выходных"
+    
+    work_start = f"{end_hour:02d}:{end_minute:02d}"
+    work_end = f"{start_hour:02d}:{start_minute:02d}"
+    
+    # Проверяем статус режима "Сон по времени"
+    sleep_time_status = "✅ ВКЛ" if time_restriction_middleware_instance.active else "❌ ВЫКЛ"
+    sleep_manual_status = "✅ ВКЛ" if settings.sleep_manual_active else "❌ ВЫКЛ"
+    
+    text = (f"<b>⏰ Настройка времени сна</b>\n\n"
+            f"<b>Статус режимов:</b>\n"
+            f"💤 Мгновенный сон: {sleep_manual_status}\n"
+            f"⏰ Сон по времени: {sleep_time_status}\n\n"
+            f"<b>⏸️ Время сна (такси не работает):</b>\n"
+            f"🕐 Начало: {start_hour:02d}:{start_minute:02d}\n"
+            f"🕐 Окончание: {end_hour:02d}:{end_minute:02d}\n"
+            f"💬 Сообщение: {message_text}\n\n"
+            f"<b>✅ Режим работы такси:</b>\n"
+            f"🕐 Часы работы: с {work_start} до {work_end}\n"
+            f"📅 Рабочие дни: {work_days_text}\n"
+            f"🚫 Выходные дни: {weekend_days_text}\n\n"
             f"Выберите, что хотите изменить:")
     
     await callback.message.answer(
@@ -590,7 +620,27 @@ async def sleep_time_save_days(message: Message, state: FSMContext):
         days = sorted({int(day) - 1 for day in days_input})
         await update_settings(sleep_days=days)
         
-        await message.answer(f'Дни сохранены: {format_sleep_days(days)}')
+        # Показываем сохраненные дни, рабочие и выходные дни
+        sleep_days_text = format_sleep_days(days)
+        all_days = set(range(7))
+        
+        # Рабочие дни - это дни, которые В списке days (такси работает, кроме времени сна)
+        work_days_set = sorted(days)
+        work_days_text = ", ".join([WEEKDAY_LABELS[d] for d in work_days_set])
+        
+        # Выходные дни - это дни, которых НЕТ в списке days (такси закрыто весь день)
+        weekend_days_set = sorted(all_days - set(days))
+        if weekend_days_set:
+            weekend_days_text = ", ".join([WEEKDAY_LABELS[d] for d in weekend_days_set])
+        else:
+            weekend_days_text = "Нет выходных"
+        
+        await message.answer(
+            f'✅ <b>Дни сохранены</b>\n\n'
+            f'📅 Дни сна: {sleep_days_text}\n'
+            f'🚫 Выходные дни: {weekend_days_text}',
+            parse_mode='HTML'
+        )
         await state.clear()
     else:
         await message.answer("Введите числа 1-7 через запятую. Пример: 1,2,3,4,5")
@@ -600,12 +650,15 @@ async def sleep_time_save_days(message: Message, state: FSMContext):
 async def sleep_time_save_message(message: Message, state: FSMContext):
     """Сохранить сообщение для режима сна"""
     text = message.text.strip()
+    if not text:
+        await message.answer("Сообщение не может быть пустым. Введите текст сообщения.")
+        return
     if len(text) > 255:
         await message.answer("Сообщение слишком длинное. Максимум 255 символов.")
         return
     await update_settings(sleep_message=text)
     
-    await message.answer(f'Сообщение сохранено:\n{text}')
+    await message.answer(f'✅ Сообщение сохранено:\n\n<b>{text}</b>', parse_mode='HTML')
     await state.clear()
 
 
@@ -1819,12 +1872,84 @@ async def admin_accept_order(callback: CallbackQuery, bot: Bot, state: FSMContex
         # Обновляем баланс водителя
         await update_driver(callback.from_user.id, price=int(driver.price - int(order_id.price * 0.10)))
         
-        # Обновляем сообщение
-        await callback.message.edit_text(
-            text=f'Номер заказа - <b><code>{order_id.id}</code></b>\n'
-                 f'Админ {driver.name} принял заказ',
-            reply_markup=await kb.go_to_order()
-        )
+        # Проверяем автораспределение - если включено, не показываем кнопку "перейти к заказу"
+        settings = await get_settings()
+        auto_distribution = settings.auto_distribution if settings else False
+        
+        # Перезагружаем заказ из базы, чтобы получить актуальные admin_messages
+        order_data = await get_all_orders(order_id.id)
+        
+        admin_info_text = (f"Номер заказа - <code>{order_id.id}</code>\n"
+                          f"Админ {driver.name} принял заказ")
+        
+        # Если автораспределение выключено, редактируем сообщение админа отдельно (с кнопкой)
+        if not auto_distribution:
+            await callback.message.edit_text(
+                text=admin_info_text,
+                reply_markup=await kb.go_to_order(),
+                parse_mode='HTML'
+            )
+        
+        # Обновляем сообщения у всех админов (или только у других, если автораспределение выключено)
+        if order_data and order_data.admin_messages:
+            for admin_id_str, admin_message_id in order_data.admin_messages.items():
+                try:
+                    admin_chat_id = int(admin_id_str)
+                    admin_msg_id = int(admin_message_id)
+                    
+                    # Если автораспределение выключено, пропускаем админа, который принял заказ (уже отредактировали выше)
+                    if not auto_distribution and admin_chat_id == callback.from_user.id:
+                        continue
+                    
+                    # Обновляем текст и убираем кнопку
+                    await bot.edit_message_text(
+                        chat_id=admin_chat_id,
+                        message_id=admin_msg_id,
+                        text=admin_info_text,
+                        reply_markup=None,
+                        parse_mode='HTML'
+                    )
+                except TelegramBadRequest as e:
+                    error_str = str(e).lower()
+                    if "message to delete not found" not in error_str and "message is not modified" not in error_str:
+                        print(f"Ошибка обновления сообщения у админа {admin_id_str}: {e}")
+                except Exception as e:
+                    print(f"Ошибка при обновлении сообщения у админа {admin_id_str}: {e}")
+                    import traceback
+                    traceback.print_exc()
+        
+        # Если автораспределение выключено и сообщение было отправлено в группу, редактируем его
+        if not auto_distribution and order_data and order_data.chat_id_driver:
+            try:
+                import os
+                group_chat_id = os.getenv('CHAT_GROUP_ID')
+                if group_chat_id:
+                    await bot.edit_message_text(
+                        chat_id=group_chat_id,
+                        message_id=int(order_data.chat_id_driver),
+                        text=admin_info_text,
+                        reply_markup=None,
+                        parse_mode='HTML'
+                    )
+            except TelegramBadRequest as e:
+                error_str = str(e).lower()
+                if "message to delete not found" not in error_str and "message is not modified" not in error_str:
+                    print(f"Ошибка обновления сообщения в группе: {e}")
+            except Exception as e:
+                print(f"Ошибка при обновлении сообщения в группе: {e}")
+        
+        # Если автораспределение включено, удаляем сообщение у водителя, которому был отправлен заказ
+        if auto_distribution and order_data and order_data.driver_id and order_data.chat_id_driver:
+            try:
+                driver_tg_id = int(order_data.driver_id)
+                driver_message_id = int(order_data.chat_id_driver)
+                await bot.delete_message(chat_id=driver_tg_id, message_id=driver_message_id)
+            except TelegramBadRequest as e:
+                error_str = str(e).lower()
+                if "message to delete not found" not in error_str:
+                    print(f"Ошибка удаления сообщения у водителя: {e}")
+            except Exception as e:
+                print(f"Ошибка при удалении сообщения у водителя: {e}")
         
         # Создаем запись о начале выполнения заказа
         try:

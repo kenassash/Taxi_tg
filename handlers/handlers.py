@@ -122,6 +122,28 @@ async def delete_order_passager(callback: CallbackQuery, bot: Bot, state: FSMCon
                                          f"<b>❌Пассажир отменил заказ</b>\n\n"
                                          f"Телефон <b>{driver_id.user_rel.phone}</b>")
         await callback.message.delete()
+        
+        # Отправляем уведомление админам об отмене заказа пассажиром (только если автораспределение включено)
+        from app.database.requests import get_settings
+        settings = await get_settings()
+        auto_distribution = settings.auto_distribution if settings else False
+        
+        if auto_distribution:
+            try:
+                admin_list = bot.my_admins_list if hasattr(bot, 'my_admins_list') else []
+                for admin_id in admin_list:
+                    try:
+                        await bot.send_message(
+                            chat_id=admin_id,
+                            text=f"❌ <b>Пассажир отменил заказ</b>\n\n"
+                                 f"Номер заказа: <b>{driver_id.id}</b>\n"
+                                 f"Водитель: <b>{driver.name}</b>\n"
+                                 f"Пассажир: <b>{driver_id.user_rel.phone}</b>"
+                        )
+                    except TelegramBadRequest as e:
+                        pass
+            except Exception as e:
+                pass
 
         await callback.message.answer(f'Заказ отменен')
 
@@ -139,6 +161,27 @@ async def delete_order_passager(callback: CallbackQuery, bot: Bot, state: FSMCon
         except TelegramBadRequest as e:
             if "message to delete not found" not in str(e):
                 print(f"Ошибка при удалении сообщения: {e}")
+        
+        # Отправляем уведомление админам об отмене заказа пассажиром (когда водитель не назначен, только если автораспределение включено)
+        from app.database.requests import get_settings
+        settings = await get_settings()
+        auto_distribution = settings.auto_distribution if settings else False
+        
+        if auto_distribution:
+            try:
+                admin_list = bot.my_admins_list if hasattr(bot, 'my_admins_list') else []
+                for admin_id in admin_list:
+                    try:
+                        await bot.send_message(
+                            chat_id=admin_id,
+                            text=f"❌ <b>Пассажир отменил заказ</b>\n\n"
+                                 f"Номер заказа: <b>{driver_id.id}</b>\n"
+                                 f"Пассажир: <b>{driver_id.user_rel.phone}</b>"
+                        )
+                    except TelegramBadRequest as e:
+                        pass
+            except Exception as e:
+                pass
 
         # Отправляем подтверждение отмены
         await callback.message.answer(f'Заказ отменен')

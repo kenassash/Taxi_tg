@@ -82,6 +82,36 @@ async def accept(callback: CallbackQuery, bot: Bot, state: FSMContext):
                 print("Сообщение уже удалено или не найдено.")
             else:
                 raise e
+        
+        # Обновляем сообщения у админов - показываем только номер заказа и кто принял
+        # Перезагружаем заказ из базы, чтобы получить актуальные admin_messages
+        order_data = await get_all_orders(order_id.id)
+        
+        if order_data and order_data.admin_messages:
+            admin_info_text = (f"Номер заказа - <code>{order_id.id}</code>\n"
+                              f"Водитель {driver.name} принял заказ")
+            
+            for admin_id_str, admin_message_id in order_data.admin_messages.items():
+                try:
+                    admin_chat_id = int(admin_id_str)
+                    admin_msg_id = int(admin_message_id)
+                    
+                    # Обновляем текст и убираем кнопку
+                    await bot.edit_message_text(
+                        chat_id=admin_chat_id,
+                        message_id=admin_msg_id,
+                        text=admin_info_text,
+                        reply_markup=None,
+                        parse_mode='HTML'
+                    )
+                except TelegramBadRequest as e:
+                    error_str = str(e).lower()
+                    if "message to delete not found" not in error_str and "message is not modified" not in error_str:
+                        print(f"Ошибка обновления сообщения у админа {admin_id_str}: {e}")
+                except Exception as e:
+                    print(f"Ошибка при обновлении сообщения у админа {admin_id_str}: {e}")
+                    import traceback
+                    traceback.print_exc()
 
         message_pass = await bot.send_photo(chat_id=order_id.user_rel.tg_id,
                                             photo=driver.photo_car,

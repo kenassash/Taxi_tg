@@ -73,11 +73,15 @@ async def on_driver_status_changed(
         item_id: str
 ):
     """Обработчик изменения статуса водителя"""
+    from app.driver_activity_check import update_driver_last_interaction
+    
     driver_id = callback.from_user.id
 
     # Обновляем статус водителя в базе
     if item_id == 'active':
         await update_driver(driver_id, active=True)
+        # Устанавливаем время последнего взаимодействия при активации
+        update_driver_last_interaction(driver_id)
         await callback.answer("Водитель активирован!")
     elif item_id == 'inactive':
         await update_driver(driver_id, active=False)
@@ -308,7 +312,28 @@ async def order_now(callback: CallbackQuery,
             )
             return
 
-        # Пытаемся отправить заказ водителю
+        # Сначала отправляем заказ админам для мониторинга
+        admin_messages_dict = {}
+        try:
+            admin_list = bot.my_admins_list if hasattr(bot, 'my_admins_list') else []
+            for admin_id in admin_list:
+                try:
+                    admin_message = await bot.send_message(
+                        chat_id=admin_id,
+                        text=f"📋 <b>Новый заказ (автораспределение)</b>\n\n"
+                             f"{text_order}\n\n"
+                             f"👤 <b>Водитель:</b> {next_driver.name}\n"
+                             f"📞 <b>Телефон:</b> {next_driver.phone}\n"
+                             f"🚕 <b>Автомобиль:</b> {next_driver.car_name}",
+                        reply_markup=await kb.accept(order_id)
+                    )
+                    admin_messages_dict[str(admin_id)] = admin_message.message_id
+                except TelegramBadRequest as e:
+                    pass
+        except Exception as e:
+            pass
+        
+        # Потом отправляем заказ водителю
         try:
             message_id_driver = await bot.send_message(
                 chat_id=next_driver.tg_id,  
@@ -334,20 +359,9 @@ async def order_now(callback: CallbackQuery,
         # Сохраняем в базу
         await set_chat_id_user(order_id, driver_id=str(next_driver.tg_id), chat_id_driver=str(message_id_driver.message_id))
         
-        # Отправляем заказ админам для мониторинга
-        try:
-            admin_list = bot.my_admins_list if hasattr(bot, 'my_admins_list') else []
-            for admin_id in admin_list:
-                try:
-                    await bot.send_message(
-                        chat_id=admin_id,
-                        text=f"📋 <b>Новый заказ (автораспределение)</b>\n\n{text_order}",
-                        reply_markup=await kb.accept(order_id)
-                    )
-                except TelegramBadRequest as e:
-                    pass
-        except Exception as e:
-            pass
+        # Сохраняем message_id админов в базу
+        if admin_messages_dict:
+            await set_chat_id_user(order_id, admin_messages=admin_messages_dict)
     else:
         dialog_manager.dialog_data.clear()
         dialog_manager.dialog_data['order_id'] = order_id
@@ -441,14 +455,72 @@ async def order_now_with_new_address1(callback: CallbackQuery,
                   f"️📍:<b>{order_data.add_new_address1} - {order_data.add_street_address1.upper()}</b>\n\n"
                   f"Цена: <b>{order_data.price}Р</b>")
 
-    message_id_driver = await dialog_manager.event.bot.send_message(chat_id=os.getenv('CHAT_GROUP_ID'),
-                                                                    text=text_order,
-                                                                    reply_markup=await kb.accept(order_id))
+    auto_distribution = await get_settings()
+    if auto_distribution.auto_distribution:
+        # Автораспределение включено - отправляем водителю
+        await check_and_reset_if_needed()
+        next_driver = await get_next_available_driver()
+        
+        if not next_driver:
+            await callback.answer(
+                "В данный момент нет свободных водителей.",
+                show_alert=True
+            )
+            return
+        
+        try:
+            message_id_driver = await dialog_manager.event.bot.send_message(
+                chat_id=next_driver.tg_id,
+                text=text_order,
+                reply_markup=await kb.accept_or_skip(order_id)
+            )
+            await increment_driver_order_count(next_driver.tg_id)
+            await set_chat_id_user(order_id, driver_id=str(next_driver.tg_id), chat_id_driver=str(message_id_driver.message_id))
+        except TelegramBadRequest as e:
+            if "chat not found" in str(e).lower():
+                await mark_driver_inactive(next_driver.tg_id)
+                await callback.answer(
+                    "Водитель недоступен. Попробуйте позже.",
+                    show_alert=True
+                )
+                return
+            else:
+                raise e
+        
+        # Отправляем заказ админам для мониторинга
+        admin_messages_dict = {}
+        try:
+            admin_list = dialog_manager.event.bot.my_admins_list if hasattr(dialog_manager.event.bot, 'my_admins_list') else []
+            for admin_id in admin_list:
+                try:
+                    admin_message = await dialog_manager.event.bot.send_message(
+                        chat_id=admin_id,
+                        text=f"📋 <b>Новый заказ (автораспределение)</b>\n\n"
+                             f"{text_order}\n\n"
+                             f"👤 <b>Водитель:</b> {next_driver.name}\n"
+                             f"📞 <b>Телефон:</b> {next_driver.phone}\n"
+                             f"🚕 <b>Автомобиль:</b> {next_driver.car_name}",
+                        reply_markup=await kb.accept(order_id)
+                    )
+                    admin_messages_dict[str(admin_id)] = admin_message.message_id
+                except TelegramBadRequest as e:
+                    pass
+        except Exception as e:
+            pass
+        
+        # Сохраняем message_id админов в базу
+        if admin_messages_dict:
+            await set_chat_id_user(order_id, admin_messages=admin_messages_dict)
+    else:
+        # Автораспределение выключено - отправляем в группу
+        message_id_driver = await dialog_manager.event.bot.send_message(chat_id=os.getenv('CHAT_GROUP_ID'),
+                                                                        text=text_order,
+                                                                        reply_markup=await kb.accept(order_id))
+        await set_chat_id_user(order_id, chat_id_driver=str(message_id_driver.message_id))
+    
     # Очищаем dialog_data, но сохраняем контекст
     dialog_manager.dialog_data.clear()
     dialog_manager.dialog_data['order_id'] = order_id
-    # запись в бд massage_id
-    await set_chat_id_user(order_id, chat_id_driver=str(message_id_driver.message_id))
     await dialog_manager.switch_to(state=AddOrder.upprice)
 
 
@@ -469,12 +541,69 @@ async def order_now_with_new_address2(callback: CallbackQuery,
                   f"️📍:<b>{order_data.add_new_address2} - {order_data.add_street_address2.upper()}</b>\n\n"
                   f"Цена: <b>{order_data.price}Р</b>")
 
-    message_id_driver = await dialog_manager.event.bot.send_message(chat_id=os.getenv('CHAT_GROUP_ID'),
-                                                                    text=text_order,
-                                                                    reply_markup=await kb.accept(order_id))
+    auto_distribution = await get_settings()
+    if auto_distribution.auto_distribution:
+        # Автораспределение включено - отправляем водителю
+        await check_and_reset_if_needed()
+        next_driver = await get_next_available_driver()
+        
+        if not next_driver:
+            await callback.answer(
+                "В данный момент нет свободных водителей.",
+                show_alert=True
+            )
+            return
+        
+        try:
+            message_id_driver = await dialog_manager.event.bot.send_message(
+                chat_id=next_driver.tg_id,
+                text=text_order,
+                reply_markup=await kb.accept_or_skip(order_id)
+            )
+            await increment_driver_order_count(next_driver.tg_id)
+            await set_chat_id_user(order_id, driver_id=str(next_driver.tg_id), chat_id_driver=str(message_id_driver.message_id))
+        except TelegramBadRequest as e:
+            if "chat not found" in str(e).lower():
+                await mark_driver_inactive(next_driver.tg_id)
+                await callback.answer(
+                    "Водитель недоступен. Попробуйте позже.",
+                    show_alert=True
+                )
+                return
+            else:
+                raise e
+        
+        # Отправляем заказ админам для мониторинга
+        admin_messages_dict = {}
+        try:
+            admin_list = dialog_manager.event.bot.my_admins_list if hasattr(dialog_manager.event.bot, 'my_admins_list') else []
+            for admin_id in admin_list:
+                try:
+                    admin_message = await dialog_manager.event.bot.send_message(
+                        chat_id=admin_id,
+                        text=f"📋 <b>Новый заказ (автораспределение)</b>\n\n"
+                             f"{text_order}\n\n"
+                             f"👤 <b>Водитель:</b> {next_driver.name}\n"
+                             f"📞 <b>Телефон:</b> {next_driver.phone}\n"
+                             f"🚕 <b>Автомобиль:</b> {next_driver.car_name}",
+                        reply_markup=await kb.accept(order_id)
+                    )
+                    admin_messages_dict[str(admin_id)] = admin_message.message_id
+                except TelegramBadRequest as e:
+                    pass
+        except Exception as e:
+            pass
+        
+        # Сохраняем message_id админов в базу
+        if admin_messages_dict:
+            await set_chat_id_user(order_id, admin_messages=admin_messages_dict)
+    else:
+        # Автораспределение выключено - отправляем в группу
+        message_id_driver = await dialog_manager.event.bot.send_message(chat_id=os.getenv('CHAT_GROUP_ID'),
+                                                                        text=text_order,
+                                                                        reply_markup=await kb.accept(order_id))
+        await set_chat_id_user(order_id, chat_id_driver=str(message_id_driver.message_id))
     # Очищаем dialog_data, но сохраняем контекст
     dialog_manager.dialog_data.clear()
     dialog_manager.dialog_data['order_id'] = order_id
-    # запись в бд massage_id
-    await set_chat_id_user(order_id, chat_id_driver=str(message_id_driver.message_id))
     await dialog_manager.switch_to(state=AddOrder.upprice)

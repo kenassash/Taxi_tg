@@ -1,5 +1,5 @@
 import os
-from typing import List
+from typing import List, Dict
 
 from sqlalchemy import BigInteger, ForeignKey, String, DateTime, func, Boolean, Integer, JSON
 from sqlalchemy.orm import Mapped, mapped_column, relationship, DeclarativeBase
@@ -75,6 +75,7 @@ class Order(Base):
     chat_id_user: Mapped[str] = mapped_column(String(100), nullable=True)
     chat_id_driver: Mapped[str] = mapped_column(String(100), nullable=True)
     driver_id: Mapped[str] = mapped_column(String(100), nullable=True)
+    admin_messages: Mapped[Dict[str, int] | None] = mapped_column(JSON, nullable=True)  # Словарь {admin_id: message_id} для хранения сообщений админам
 
     drivers_reply: Mapped[List['Driver']] = relationship(back_populates='orders_reply',
                                                          secondary='order_executions')

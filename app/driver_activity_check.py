@@ -20,6 +20,10 @@ import app.keyboards as kb
 # Ключ: tg_id водителя, Значение: datetime отправки запроса
 activity_check_requests: Dict[int, datetime] = {}
 
+# Хранилище времени последнего взаимодействия водителя
+# Ключ: tg_id водителя, Значение: datetime последнего взаимодействия
+driver_last_interaction: Dict[int, datetime] = {}
+
 
 async def _get_timeout_minutes() -> int:
     settings = await get_settings()
@@ -28,8 +32,24 @@ async def _get_timeout_minutes() -> int:
     return 10
 
 
+async def _get_interval_hours() -> int:
+    """Получить интервал проверки активности в часах"""
+    settings = await get_settings()
+    if settings and settings.driver_check_interval_hours is not None:
+        return max(1, settings.driver_check_interval_hours)
+    return 1
+
+
+def update_driver_last_interaction(driver_tg_id: int):
+    """Обновить время последнего взаимодействия водителя"""
+    driver_last_interaction[driver_tg_id] = datetime.now()
+    # Если водитель ответил на запрос активности, удаляем его из списка ожидающих
+    if driver_tg_id in activity_check_requests:
+        del activity_check_requests[driver_tg_id]
+
+
 async def send_activity_check_to_drivers(bot: Bot):
-    """Отправляет сообщение с проверкой активности всем активным водителям"""
+    """Отправляет сообщение с проверкой активности водителям, если прошло больше часа с последнего взаимодействия"""
     # Проверяем, включено ли автораспределение
     settings = await get_settings()
     if not settings or not settings.auto_distribution:
@@ -44,9 +64,27 @@ async def send_activity_check_to_drivers(bot: Bot):
     current_time = datetime.now()
     sent_count = 0
     failed_count = 0
+    skipped_count = 0
     timeout_minutes = await _get_timeout_minutes()
+    interval_hours = await _get_interval_hours()
 
     for driver in drivers:
+        # Проверяем, прошло ли больше часа с последнего взаимодействия
+        last_interaction = driver_last_interaction.get(driver.tg_id)
+        
+        # Если водитель уже получил запрос активности и еще не ответил - пропускаем
+        if driver.tg_id in activity_check_requests:
+            skipped_count += 1
+            continue
+        
+        # Если есть время последнего взаимодействия и прошло меньше часа - пропускаем
+        if last_interaction:
+            time_since_interaction = current_time - last_interaction
+            if time_since_interaction < timedelta(hours=interval_hours):
+                skipped_count += 1
+                continue
+        
+        # Если нет времени последнего взаимодействия или прошло больше часа - отправляем запрос
         try:
             await bot.send_message(
                 chat_id=driver.tg_id,
@@ -68,7 +106,7 @@ async def send_activity_check_to_drivers(bot: Bot):
             print(f"Неожиданная ошибка при отправке сообщения водителю {driver.tg_id}: {e}")
             failed_count += 1
 
-    print(f"Проверка активности: отправлено {sent_count}, ошибок {failed_count}")
+    print(f"Проверка активности: отправлено {sent_count}, пропущено {skipped_count}, ошибок {failed_count}")
 
 
 async def check_driver_activity_responses(bot: Bot):
@@ -102,6 +140,5 @@ async def check_driver_activity_responses(bot: Bot):
 
 def mark_driver_responded(driver_tg_id: int):
     """Отмечает, что водитель ответил на запрос активности"""
-    if driver_tg_id in activity_check_requests:
-        del activity_check_requests[driver_tg_id]
+    update_driver_last_interaction(driver_tg_id)
 
