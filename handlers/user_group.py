@@ -62,9 +62,15 @@ async def accept(callback: CallbackQuery, bot: Bot, state: FSMContext):
             )
             return
         await update_driver(callback.from_user.id, price=int(driver.price - int(order_id.price * 0.10)))
-        await callback.message.edit_text(text=f'Номер заказа - <b><code>{order_id.id}</code></b>\n'
-                                              f'Водитель {driver.name} принял заказ',
-                                         reply_markup=await kb.go_to_order())
+        
+        # Проверяем автораспределение
+        settings = await get_settings()
+        auto_distribution = settings.auto_distribution if settings else False
+        
+        # Формируем текст без слова "Водитель"
+        info_text = (f"Номер заказа - <code>{order_id.id}</code>\n"
+                     f"{driver.name} принял заказ")
+        
         # if not driver.active:
         #     await bot.send_message(chat_id=callback.from_user.id,
         #                            text=f"Вы не активны и не можете принимать заказы.\n"
@@ -87,14 +93,33 @@ async def accept(callback: CallbackQuery, bot: Bot, state: FSMContext):
         # Перезагружаем заказ из базы, чтобы получить актуальные admin_messages
         order_data = await get_all_orders(order_id.id)
         
+        # Если автораспределение включено, редактируем сообщение у водителя/админа без кнопки
+        if auto_distribution:
+            await callback.message.edit_text(
+                text=info_text,
+                reply_markup=None,
+                parse_mode='HTML'
+            )
+        # Если автораспределение выключено, редактируем сообщение с кнопкой (для админов в личных сообщениях)
+        else:
+            await callback.message.edit_text(
+                text=info_text,
+                reply_markup=await kb.go_to_order(),
+                parse_mode='HTML'
+            )
+        
         if order_data and order_data.admin_messages:
             admin_info_text = (f"Номер заказа - <code>{order_id.id}</code>\n"
-                              f"Водитель {driver.name} принял заказ")
+                              f"{driver.name} принял заказ")
             
             for admin_id_str, admin_message_id in order_data.admin_messages.items():
                 try:
                     admin_chat_id = int(admin_id_str)
                     admin_msg_id = int(admin_message_id)
+                    
+                    # Если автораспределение выключено, пропускаем того, кто принял заказ (уже отредактировали выше)
+                    if not auto_distribution and admin_chat_id == callback.from_user.id:
+                        continue
                     
                     # Обновляем текст и убираем кнопку
                     await bot.edit_message_text(
@@ -112,14 +137,53 @@ async def accept(callback: CallbackQuery, bot: Bot, state: FSMContext):
                     print(f"Ошибка при обновлении сообщения у админа {admin_id_str}: {e}")
                     import traceback
                     traceback.print_exc()
+        
+        # Если автораспределение включено, удаляем сообщение у водителя, которому был отправлен заказ
+        if auto_distribution and order_data and order_data.driver_id and order_data.chat_id_driver:
+            try:
+                driver_tg_id = int(order_data.driver_id)
+                driver_message_id = int(order_data.chat_id_driver)
+                await bot.delete_message(chat_id=driver_tg_id, message_id=driver_message_id)
+            except TelegramBadRequest as e:
+                error_str = str(e).lower()
+                if "message to delete not found" not in error_str:
+                    print(f"Ошибка удаления сообщения у водителя: {e}")
+            except Exception as e:
+                print(f"Ошибка при удалении сообщения у водителя: {e}")
 
-        message_pass = await bot.send_photo(chat_id=order_id.user_rel.tg_id,
-                                            photo=driver.photo_car,
-                                            caption=f'🤝<b>ВАШ ЗАКАЗ ПРИНЯТ</b>\n'
-                                                    f'👤{driver.name} на {driver.car_name}\n'
-                                                    f'🚕Номер авто: {driver.number_car}\n'
-                                                    f'📞Телефон: {driver.phone}\n'
-                                                    f'💰Цена поездки: {order_id.price} руб\n')
+        # Если автораспределение выключено и сообщение было отправлено в группу, обновляем его с кнопкой
+        if not auto_distribution and order_data and order_data.chat_id_driver:
+            try:
+                group_chat_id = os.getenv('CHAT_GROUP_ID')
+                if group_chat_id:
+                    await bot.edit_message_text(
+                        chat_id=group_chat_id,
+                        message_id=int(order_data.chat_id_driver),
+                        text=info_text,
+                        reply_markup=await kb.go_to_order(),
+                        parse_mode='HTML'
+                    )
+            except TelegramBadRequest as e:
+                error_str = str(e).lower()
+                if "message to delete not found" not in error_str and "message is not modified" not in error_str:
+                    print(f"Ошибка обновления сообщения в группе: {e}")
+            except Exception as e:
+                print(f"Ошибка при обновлении сообщения в группе: {e}")
+
+        # Отправляем сообщение пользователю
+        try:
+            message_pass = await bot.send_photo(
+                chat_id=order_id.user_rel.tg_id,
+                photo=driver.photo_car,
+                caption=f'🤝<b>ВАШ ЗАКАЗ ПРИНЯТ</b>\n'
+                        f'👤{driver.name} на {driver.car_name}\n'
+                        f'🚕Номер авто: {driver.number_car}\n'
+                        f'📞Телефон: {driver.phone}\n'
+                        f'💰Цена поездки: {order_id.price} руб\n'
+            )
+        except Exception as e:
+            print(f"Ошибка отправки сообщения пользователю: {e}")
+            message_pass = None
 
         # Обновляем состояние, сохраняя идентификатор отправленного сообщения
 
@@ -136,17 +200,26 @@ async def accept(callback: CallbackQuery, bot: Bot, state: FSMContext):
         text_driver += (f"Цена: <b>{order_id.price}Р</b>\n\n"
                         f'⌚ Выберите время подачи: ⬇️')
 
-        message_driver = await bot.send_message(chat_id=callback.from_user.id,
-                                                text=text_driver,
-                                                reply_markup=await kb.time_wait(order_id.id))
-        # записываем в бд чат
-        await set_chat_id_driver(order_id.id, message_pass.message_id)
-        await set_chat_id_user(order_id.id, chat_id_driver=str(message_driver.message_id))
-
-        await bot.edit_message_reply_markup(
-            chat_id=order_id.user_rel.tg_id,
-            message_id=message_pass.message_id,
-            reply_markup=await kb.delete_order(order_id.id))
+        try:
+            message_driver = await bot.send_message(
+                chat_id=callback.from_user.id,
+                text=text_driver,
+                reply_markup=await kb.time_wait(order_id.id)
+            )
+            # Записываем в БД
+            if message_pass:
+                await set_chat_id_driver(order_id.id, message_pass.message_id)
+            await set_chat_id_user(order_id.id, chat_id_driver=str(message_driver.message_id))
+            
+            # Обновляем сообщение у пользователя
+            if message_pass:
+                await bot.edit_message_reply_markup(
+                    chat_id=order_id.user_rel.tg_id,
+                    message_id=message_pass.message_id,
+                    reply_markup=await kb.delete_order(order_id.id)
+                )
+        except Exception as e:
+            print(f"Ошибка отправки деталей заказа: {e}")
 
 
 
